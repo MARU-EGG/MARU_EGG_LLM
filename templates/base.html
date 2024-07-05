@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}My Site{% endblock %}</title>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <h1>main</h1>
+    <a href="{% url 'main' %}">파일 업로드</a>
+    {% block content %}{% endblock %}
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

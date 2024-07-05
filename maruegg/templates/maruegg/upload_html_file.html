@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Upload HTML{% endblock %}
+
+{% block extra_head %}
+<style>
+    #drop_zone {
+        border: 2px dashed #ccc;
+        width: 300px;
+        height: 200px;
+        line-height: 200px;
+        text-align: center;
+        margin: 20px auto;
+    }
+    #drop_zone.hover {
+        border-color: #000;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>HTML Upload</h1>
+<div id="drop_zone">Drop HTML file here</div>
+<form id="upload_form" action="{% url 'upload_html' %}" method="post" enctype="multipart/form-data" style="display: none;">
+    {% csrf_token %}
+    <input type="file" name="html_file" id="file_input">
+</form>
+<div id="html_content">
+    {% if tables_text %}
+        <pre>{{ tables_text }}</pre>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    var dropZone = document.getElementById('drop_zone');
+    var fileInput = document.getElementById('file_input');
+    var uploadForm = document.getElementById('upload_form');
+
+    dropZone.addEventListener('dragover', function(event) {
+        event.preventDefault();
+        dropZone.classList.add('hover');
+    });
+
+    dropZone.addEventListener('dragleave', function(event) {
+        dropZone.classList.remove('hover');
+    });
+
+    dropZone.addEventListener('drop', function(event) {
+        event.preventDefault();
+        dropZone.classList.remove('hover');
+        fileInput.files = event.dataTransfer.files;
+        uploadForm.submit();
+    });
+</script>
+{% endblock %}
