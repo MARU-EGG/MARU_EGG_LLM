@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Ask a Question{% endblock %}
+
+{% block content %}
+<h1>Ask a Question</h1>
+<form action="{% url 'ask_question_api' %}" method="post">
+    {% csrf_token %}
+    <label for="question">Question:</label><br>
+    <input type="text" id="question" name="question" value="{% if question %}{{ question }}{% endif %}"><br>
+    <button type="submit">Ask</button>
+</form>
+<div id="answer">
+    {% if question and answer %}
+        <h2>Question:</h2>
+        <p>{{ question }}</p>
+        <h2>Answer:</h2>
+        <p>{{ answer }}</p>
+    {% endif %}
+</div>
+{% endblock %}

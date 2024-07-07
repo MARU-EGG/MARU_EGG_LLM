@@ -25,11 +25,9 @@
     {% csrf_token %}
     <input type="file" name="html_file" id="file_input">
 </form>
-<div id="html_content">
-    {% if tables_text %}
-        <pre>{{ tables_text }}</pre>
-    {% endif %}
-</div>
+{% if message %}
+    <p>{{ message }}</p>
+{% endif %}
 {% endblock %}
 
 {% block extra_scripts %}

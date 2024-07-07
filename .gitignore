@@ -9,7 +9,7 @@ today_orders
 db.sqlite3
 db.sqlite3-journal
 media
-secretskey.json
+secrets.json
 
 ### Django.Python Stack ###
 # Byte-compiled / optimized / DLL files
