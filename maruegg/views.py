@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from bs4 import BeautifulSoup
 import tempfile
@@ -18,7 +18,68 @@ logger = logging.getLogger(__name__)
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-def split_text(text, max_length=1000):
+
+@csrf_exempt
+def test(request):
+    if request.method == "POST":
+        received_value = request.POST.get("string_value", "")
+        
+        logger.debug(f"Received value: {received_value}")
+        
+        return JsonResponse({"message": "요청이 잘 들어왔습니다", "received_value": received_value})
+    return HttpResponse("Invalid request", status=400)
+
+
+@csrf_exempt
+def api_ask_question(request):
+    if request.method == "POST":
+        question_type = request.POST.get("questionType")
+        question_category = request.POST.get("questionCategory")
+        content = request.POST.get("content")
+
+        logger.debug(f"Received questionType: {question_type}")
+        logger.debug(f"Received questionCategory: {question_category}")
+
+        if not content:
+            return JsonResponse({"error": "No content provided"}, status=400)
+
+        logger.debug(f"Searching for content: {content}")
+        
+        start_time = time.time()
+        context = get_relevant_documents(content)
+        end_time = time.time()
+        retrieval_time = end_time - start_time
+        logger.debug(f"Document retrieval took {retrieval_time:.2f} seconds")
+
+        if not context:
+            logger.debug("No relevant documents found.")
+            return JsonResponse({"error": "No relevant documents found"}, status=404)
+        
+        logger.debug(f"Context for content: {context[:100]}...")
+        
+        start_time = time.time()
+        
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": f"Context: {context}\n\nQ: {content}\nA:"}
+            ]
+        )
+        end_time = time.time()
+        completion_time = end_time - start_time
+        logger.debug(f"OpenAI completion took {completion_time:.2f} seconds")
+        
+        answer = response.choices[0].message.content.strip()
+        
+        return JsonResponse({"questionType": question_type, "questionCategory": question_category, "answer": answer})
+
+    return JsonResponse({"error": "Invalid request"}, status=400)
+
+
+
+
+def split_text(text, max_length=500):
     words = text.split()
     chunks = []
     current_chunk = []
@@ -48,6 +109,9 @@ def upload_html(request):
             temp_file_path = temp_file.name
 
         try:
+            logger.debug("Deleting all documents from the database")
+            Document.objects.all().delete()
+
             with open(temp_file_path, 'r', encoding='utf-8') as file:
                 soup = BeautifulSoup(file, 'html.parser')
 
@@ -62,7 +126,7 @@ def upload_html(request):
                 tables_text += "\n"
 
             title = html_file.name
-            parts = split_text(tables_text, max_length=1000)
+            parts = split_text(tables_text, max_length=500)
             for i, part in enumerate(parts):
                 Document.objects.create(title=title, content=part, part=i+1)
                 logger.debug(f"Document part {i+1} created with content: {part[:100]}...")  # 처음 100자만 출력
