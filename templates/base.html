@@ -6,7 +6,8 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <h1>Main</h1>
+    <h1>메인</h1>
+    <a href="{% url 'root' %}">메인으로 돌아가기</a>
     <nav>
         <a href="{% url 'main' %}">파일 업로드</a>
         <a href="{% url 'ask_question_api' %}">open ai api 로 질문하기</a>
