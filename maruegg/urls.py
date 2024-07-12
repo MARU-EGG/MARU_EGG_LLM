@@ -7,5 +7,5 @@ urlpatterns = [
     path("ask_question_api/", views.ask_question_api, name="ask_question_api"),
     path("ask_question_model/", views.ask_question_model, name="ask_question_model"),
     path('test/', views.test, name='test'),
-    path('api_ask_question/', views.api_ask_question, name='api_ask_question'),  # 새로운 API URL 추가
+    path('api_ask_question/', views.api_ask_question, name='api_ask_question'),
 ]
