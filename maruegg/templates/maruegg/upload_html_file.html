@@ -15,15 +15,36 @@
     #drop_zone.hover {
         border-color: #000;
     }
+    #upload_form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 20px;
+    }
+    #upload_form label {
+        margin-top: 10px;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <h1>HTML Upload</h1>
 <div id="drop_zone">Drop HTML file here</div>
-<form id="upload_form" action="{% url 'upload_html' %}" method="post" enctype="multipart/form-data" style="display: none;">
+<form id="upload_form" action="{% url 'upload_html' %}" method="post" enctype="multipart/form-data">
     {% csrf_token %}
-    <input type="file" name="html_file" id="file_input">
+    <input type="file" name="html_file" id="file_input" style="margin-top: 10px;">
+    <label for="type_select">Type:</label>
+    <select name="type" id="type_select">
+        <option value="수시">수시</option>
+        <option value="정시">정시</option>
+        <option value="편입학">편입학</option>
+    </select>
+    <label for="category_select">Category:</label>
+    <select name="category" id="category_select">
+        <option value="모집요강">모집요강</option>
+        <option value="입시결과">입시결과</option>
+        <option value="기출문제">기출문제</option>
+    </select>
 </form>
 {% if message %}
     <p>{{ message }}</p>
@@ -35,6 +56,8 @@
     var dropZone = document.getElementById('drop_zone');
     var fileInput = document.getElementById('file_input');
     var uploadForm = document.getElementById('upload_form');
+    var typeSelect = document.getElementById('type_select');
+    var categorySelect = document.getElementById('category_select');
 
     dropZone.addEventListener('dragover', function(event) {
         event.preventDefault();
@@ -49,7 +72,12 @@
         event.preventDefault();
         dropZone.classList.remove('hover');
         fileInput.files = event.dataTransfer.files;
-        uploadForm.submit();
+
+        if (typeSelect.value && categorySelect.value) {
+            uploadForm.submit();
+        } else {
+            alert("Please select both type and category.");
+        }
     });
 </script>
 {% endblock %}

@@ -8,6 +8,21 @@
     {% csrf_token %}
     <label for="question">Question:</label><br>
     <input type="text" id="question" name="question" value="{% if question %}{{ question }}{% endif %}"><br>
+
+    <label for="question_type">Type:</label><br>
+    <select name="questionType" id="question_type">
+        <option value="수시">수시</option>
+        <option value="정시">정시</option>
+        <option value="편입학">편입학</option>
+    </select><br>
+
+    <label for="question_category">Category:</label><br>
+    <select name="questionCategory" id="question_category">
+        <option value="모집요강">모집요강</option>
+        <option value="입시결과">입시결과</option>
+        <option value="기출문제">기출문제</option>
+    </select><br>
+
     <button type="submit">Ask</button>
 </form>
 <div id="answer">
