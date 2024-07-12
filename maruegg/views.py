@@ -29,7 +29,7 @@ from rest_framework.decorators import parser_classes
 
 @swagger_auto_schema(
     method='post',
-    operation_description="Upload an HTML file along with its type and category",
+    operation_description="LLM모델이 답변할 기반이 되는 html파일 업로드 api입니다. type, category에 따라 db에 저장되는 위치가 달라집니다.",
     manual_parameters=[
         openapi.Parameter(
             'type',
