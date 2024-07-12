@@ -53,7 +53,8 @@ PROJECT_APPS = [
     "accounts",
 ]
 THIRD_PARTY_APPS = [
-
+    'drf_yasg',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [

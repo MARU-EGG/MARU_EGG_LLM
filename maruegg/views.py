@@ -12,6 +12,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import time
+from rest_framework.decorators import api_view
+from rest_framework.views import APIView
+from drf_yasg.utils       import swagger_auto_schema
+from drf_yasg             import openapi   
+
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -19,14 +24,28 @@ logger = logging.getLogger(__name__)
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
+@swagger_auto_schema(
+    method='post',
+    manual_parameters=[
+        openapi.Parameter(
+            'string_value',
+            openapi.IN_QUERY,
+            description='String value to be processed',
+            required=True,
+            type=openapi.TYPE_STRING
+        )
+    ],
+    responses={200: 'Success', 400: 'Invalid request'}
+)
+@api_view(['POST'])
 @csrf_exempt
 def test(request):
     if request.method == "POST":
-        received_value = request.POST.get("string_value", "")
-        
+        received_value = request.query_params.get("string_value", "")
         logger.debug(f"Received value: {received_value}")
-        
-        return JsonResponse({"message": "요청이 잘 들어왔습니다", "received_value": received_value})
+        if received_value:
+            return JsonResponse({"message": "요청이 잘 들어왔습니다", "received_value": received_value}, status=200)
+        return JsonResponse({"error": "string_value is required"}, status=400)
     return HttpResponse("Invalid request", status=400)
 
 
