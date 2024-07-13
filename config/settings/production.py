@@ -2,7 +2,7 @@ from .base import *
 
 DEBUG = False
 
-ALLOWED_HOSTS = ['15.165.74.42']
+ALLOWED_HOSTS = ['52.79.108.105']
 
 DJANGO_APPS+=[]
 PROJECT_APPS+=[]
