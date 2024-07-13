@@ -5,6 +5,8 @@ class Document1(models.Model):
         ('모집요강', '모집요강'),
         ('입시결과', '입시결과'),
         ('기출문제', '기출문제'),
+        ('대학생활', '대학생활'),
+        ('면접/실기', '면접/실기'),
     ]
     title = models.CharField(max_length=200)
     content = models.TextField()
@@ -19,6 +21,8 @@ class Document2(models.Model):
         ('모집요강', '모집요강'),
         ('입시결과', '입시결과'),
         ('기출문제', '기출문제'),
+        ('대학생활', '대학생활'),
+        ('면접/실기', '면접/실기'),
     ]
     title = models.CharField(max_length=200)
     content = models.TextField()
@@ -33,6 +37,8 @@ class Document3(models.Model):
         ('모집요강', '모집요강'),
         ('입시결과', '입시결과'),
         ('기출문제', '기출문제'),
+        ('대학생활', '대학생활'),
+        ('면접/실기', '면접/실기'),
     ]
     title = models.CharField(max_length=200)
     content = models.TextField()

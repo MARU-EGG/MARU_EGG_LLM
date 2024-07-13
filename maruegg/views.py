@@ -9,8 +9,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from .models import Document1, Document2, Document3
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
-from drf_yasg.utils       import swagger_auto_schema
-from drf_yasg             import openapi
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 import tempfile
 import os
 import numpy as np
@@ -42,10 +42,10 @@ from rest_framework.decorators import parser_classes
         openapi.Parameter(
             'category',
             openapi.IN_FORM,
-            description='Category of the document (모집요강, 입시결과, 기출문제)',
+            description='Category of the document (모집요강, 입시결과, 기출문제, 대학생활, 면접/실기)',
             required=True,
             type=openapi.TYPE_STRING,
-            enum=['모집요강', '입시결과', '기출문제']
+            enum=['모집요강', '입시결과', '기출문제', '대학생활', '면접/실기']
         ),
         openapi.Parameter(
             'html_file',
@@ -72,7 +72,7 @@ def upload_html(request):
         if doc_type not in ["수시", "정시", "편입학"]:
             return JsonResponse({"error": "Invalid type provided"}, status=400)
         
-        if doc_category not in ["모집요강", "입시결과", "기출문제"]:
+        if doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
             return JsonResponse({"error": "Invalid category provided"}, status=400)
 
         model_class = None
@@ -137,7 +137,7 @@ from rest_framework.parsers import FormParser
 
 @swagger_auto_schema(
     method='post',
-    operation_description="questionType(수시, 정시, 편입학), questionCategory(모집요강, 입시결과, 기출문제), question(질문)을 기반으로 rag방식 llm모델의 답변을 요청하는 api",
+    operation_description="questionType(수시, 정시, 편입학), questionCategory(모집요강, 입시결과, 기출문제, 대학생활, 면접/실기), question(질문)을 기반으로 rag방식 llm모델의 답변을 요청하는 api",
     manual_parameters=[
         openapi.Parameter(
             'questionType',
@@ -150,10 +150,11 @@ from rest_framework.parsers import FormParser
         openapi.Parameter(
             'questionCategory',
             openapi.IN_FORM,
-            description='Category of the question (모집요강, 입시결과, 기출문제)',
-            required=True,
+            description='Category of the question (모집요강, 입시결과, 기출문제, 대학생활, 면접/실기)',
+            required=False,
             type=openapi.TYPE_STRING,
-            enum=['모집요강', '입시결과', '기출문제']
+            enum=['', '모집요강', '입시결과', '기출문제', '대학생활', '면접/실기'],
+            default=''
         ),
         openapi.Parameter(
             'question',
@@ -172,7 +173,7 @@ def ask_question_api(request):
     if request.method == "POST":
         question = request.POST.get("question")
         question_type = request.POST.get("questionType")
-        question_category = request.POST.get("questionCategory")
+        question_category = request.POST.get("questionCategory", "")
 
         logger.debug(f"Received question: {question}")
         logger.debug(f"Received question type: {question_type}")
@@ -184,9 +185,6 @@ def ask_question_api(request):
         if question_type not in ["수시", "정시", "편입학"]:
             return JsonResponse({"error": "Invalid question type provided"}, status=400)
         
-        if question_category not in ["모집요강", "입시결과", "기출문제"]:
-            return JsonResponse({"error": "Invalid question category provided"}, status=400)
-
         start_time = time.time()
         context = get_relevant_documents(question_type, question_category, question)
         end_time = time.time()
@@ -228,7 +226,11 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
     elif question_type == "편입학":
         model_class = Document3
 
-    documents = model_class.objects.filter(category=question_category)
+    if question_category:
+        documents = model_class.objects.filter(category=question_category)
+    else:
+        documents = model_class.objects.all()
+
     if not documents.exists():
         return ""
 
