@@ -16,6 +16,9 @@ import os
 import numpy as np
 import time
 import logging
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.decorators import parser_classes
+from rest_framework.parsers import FormParser
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -23,9 +26,6 @@ client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 def main(request):
     return render(request, "maruegg/upload_html_file.html")
-
-from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.decorators import parser_classes
 
 @swagger_auto_schema(
     method='post',
@@ -86,9 +86,10 @@ def upload_html(request):
         with tempfile.NamedTemporaryFile(delete=False, suffix='.html') as temp_file:
             temp_file.write(html_file.read())
             temp_file_path = temp_file.name
+
         try:
-            logger.debug(f"Deleting all documents from {model_class.__name__} in the database")
-            model_class.objects.all().delete()
+            logger.debug(f"Deleting documents from {model_class.__name__} in the database with category {doc_category}")
+            model_class.objects.filter(category=doc_category).delete()
 
             with open(temp_file_path, 'r', encoding='utf-8') as file:
                 soup = BeautifulSoup(file, 'html.parser')
@@ -132,8 +133,6 @@ def split_text(text, max_length=1500):
     if current_chunk:
         chunks.append(' '.join(current_chunk))
     return chunks
-
-from rest_framework.parsers import FormParser
 
 @swagger_auto_schema(
     method='post',
