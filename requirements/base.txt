@@ -23,6 +23,7 @@ dataclasses-json==0.6.7
 Deprecated==1.2.14
 distro==1.9.0
 Django==5.0.6
+django-cors-headers==4.4.0
 djangorestframework==3.15.2
 dnspython==2.6.1
 drf-yasg==1.21.7
