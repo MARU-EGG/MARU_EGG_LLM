@@ -21,17 +21,17 @@ from rest_framework.decorators import parser_classes
 from rest_framework.parsers import FormParser
 
 # LangChain imports
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_community.chat_models import ChatOllama
-from langchain_core.runnables import RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.schema import Document
-import requests
-from transformers import AutoTokenizer, AutoModel
-import torch
+# from langchain.embeddings import HuggingFaceEmbeddings
+# from langchain_community.vectorstores import Chroma
+# from langchain_community.chat_models import ChatOllama
+# from langchain_core.runnables import RunnablePassthrough
+# from langchain_core.output_parsers import StrOutputParser
+# from langchain_core.prompts import ChatPromptTemplate
+# from langchain.text_splitter import RecursiveCharacterTextSplitter
+# from langchain.schema import Document
+# import requests
+# from transformers import AutoTokenizer, AutoModel
+# import torch
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -258,104 +258,104 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
     
     return context
 
-@swagger_auto_schema(
-    method='post',
-    operation_description="LLM을 사용하여 질문에 답변을 생성하는 API입니다. 질문을 보내면 데이터베이스에서 관련 문서를 검색하고 답변을 생성합니다.",
-    manual_parameters=[
-        openapi.Parameter(
-            'questionType',
-            openapi.IN_FORM,
-            description='Type of the question (수시, 정시, 편입학)',
-            required=True,
-            type=openapi.TYPE_STRING,
-            enum=['수시', '정시', '편입학']
-        ),
-        openapi.Parameter(
-            'questionCategory',
-            openapi.IN_FORM,
-            description='Category of the question (모집요강, 입시결과, 기출문제, 대학생활, 면접/실기)',
-            required=False,
-            type=openapi.TYPE_STRING,
-            enum=['', '모집요강', '입시결과', '기출문제', '대학생활', '면접/실기'],
-            default=''
-        ),
-        openapi.Parameter(
-            'question',
-            openapi.IN_FORM,
-            description='The actual question content',
-            required=True,
-            type=openapi.TYPE_STRING
-        ),
-    ],
-    responses={200: 'Success', 400: 'Invalid request', 404: 'No relevant documents found'}
-)
-@csrf_exempt
-@api_view(['POST'])
-@parser_classes([FormParser])
-def ask_question_model(request):
-    if request.method == "POST":
-        question = request.POST.get("question")
-        question_type = request.POST.get("questionType")
-        question_category = request.POST.get("questionCategory", "")
+# @swagger_auto_schema(
+#     method='post',
+#     operation_description="LLM을 사용하여 질문에 답변을 생성하는 API입니다. 질문을 보내면 데이터베이스에서 관련 문서를 검색하고 답변을 생성합니다.",
+#     manual_parameters=[
+#         openapi.Parameter(
+#             'questionType',
+#             openapi.IN_FORM,
+#             description='Type of the question (수시, 정시, 편입학)',
+#             required=True,
+#             type=openapi.TYPE_STRING,
+#             enum=['수시', '정시', '편입학']
+#         ),
+#         openapi.Parameter(
+#             'questionCategory',
+#             openapi.IN_FORM,
+#             description='Category of the question (모집요강, 입시결과, 기출문제, 대학생활, 면접/실기)',
+#             required=False,
+#             type=openapi.TYPE_STRING,
+#             enum=['', '모집요강', '입시결과', '기출문제', '대학생활', '면접/실기'],
+#             default=''
+#         ),
+#         openapi.Parameter(
+#             'question',
+#             openapi.IN_FORM,
+#             description='The actual question content',
+#             required=True,
+#             type=openapi.TYPE_STRING
+#         ),
+#     ],
+#     responses={200: 'Success', 400: 'Invalid request', 404: 'No relevant documents found'}
+# )
+# @csrf_exempt
+# @api_view(['POST'])
+# @parser_classes([FormParser])
+# def ask_question_model(request):
+#     if request.method == "POST":
+#         question = request.POST.get("question")
+#         question_type = request.POST.get("questionType")
+#         question_category = request.POST.get("questionCategory", "")
 
-        logger.debug(f"Received question: {question}")
-        logger.debug(f"Received question type: {question_type}")
-        logger.debug(f"Received question category: {question_category}")
+#         logger.debug(f"Received question: {question}")
+#         logger.debug(f"Received question type: {question_type}")
+#         logger.debug(f"Received question category: {question_category}")
 
-        if not question:
-            return JsonResponse({"error": "No content provided"}, status=400)
+#         if not question:
+#             return JsonResponse({"error": "No content provided"}, status=400)
 
-        if question_type not in ["수시", "정시", "편입학"]:
-            return JsonResponse({"error": "Invalid question type provided"}, status=400)
+#         if question_type not in ["수시", "정시", "편입학"]:
+#             return JsonResponse({"error": "Invalid question type provided"}, status=400)
 
-        # Get relevant documents from the database
-        context = get_relevant_documents(question_type, question_category, question)
-        if not context:
-            logger.debug("No relevant documents found.")
-            return JsonResponse({"error": "No relevant documents found"}, status=404)
+#         # Get relevant documents from the database
+#         context = get_relevant_documents(question_type, question_category, question)
+#         if not context:
+#             logger.debug("No relevant documents found.")
+#             return JsonResponse({"error": "No relevant documents found"}, status=404)
 
-        # Convert context to a list of Document objects
-        docs = [Document(page_content=content) for content in context.split("\n\n")]
+#         # Convert context to a list of Document objects
+#         docs = [Document(page_content=content) for content in context.split("\n\n")]
 
-        # Set up LangChain components
-        embeddings = HuggingFaceEmbeddings(
-            model_name='BAAI/bge-m3', 
-            model_kwargs={'device':'mps'}, 
-            encode_kwargs={'normalize_embeddings':True}
-        )
-        vectorstore = Chroma.from_documents(docs, embeddings, persist_directory='vectorstore')
-        vectorstore.persist()
+#         # Set up LangChain components
+#         embeddings = HuggingFaceEmbeddings(
+#             model_name='BAAI/bge-m3', 
+#             model_kwargs={'device':'mps'}, 
+#             encode_kwargs={'normalize_embeddings':True}
+#         )
+#         vectorstore = Chroma.from_documents(docs, embeddings, persist_directory='vectorstore')
+#         vectorstore.persist()
         
-        # Set up the retriever
-        retriever = vectorstore.as_retriever(search_kwargs={'k': 3})
+#         # Set up the retriever
+#         retriever = vectorstore.as_retriever(search_kwargs={'k': 3})
 
-        # Set up the prompt template
-        template = '''당신은 친절한 챗봇으로서 명지대학교 입시 관련 질문자 요청에 최대한 자세하고 친절하게 답변해야 합니다. 모든 대답은 한국어(Korean)으로 대답해 주세요. 만약 질문이 명지대학교 입시와 관련이 없다면 "해당 내용은 답변할 수 없습니다!"라고 대답해 주세요:
-        {context}
+#         # Set up the prompt template
+#         template = '''당신은 친절한 챗봇으로서 명지대학교 입시 관련 질문자 요청에 최대한 자세하고 친절하게 답변해야 합니다. 모든 대답은 한국어(Korean)으로 대답해 주세요. 만약 질문이 명지대학교 입시와 관련이 없다면 "해당 내용은 답변할 수 없습니다!"라고 대답해 주세요:
+#         {context}
 
-        Question: {question}
-        '''
-        prompt = ChatPromptTemplate.from_template(template)
+#         Question: {question}
+#         '''
+#         prompt = ChatPromptTemplate.from_template(template)
 
-        # Define the chain components
-        def format_docs(docs):
-            return '\n\n'.join([d.page_content for d in docs])
+#         # Define the chain components
+#         def format_docs(docs):
+#             return '\n\n'.join([d.page_content for d in docs])
 
-        rag_chain = (
-            {'context': retriever | format_docs, 'question': RunnablePassthrough()}
-            | prompt
-            | ChatOllama(model="EEVE-Korean-10.8B:latest", base_url="https://e9b5-128-134-33-155.ngrok-free.app")
-            | StrOutputParser()
-        )
+#         rag_chain = (
+#             {'context': retriever | format_docs, 'question': RunnablePassthrough()}
+#             | prompt
+#             | ChatOllama(model="EEVE-Korean-10.8B:latest", base_url="https://e9b5-128-134-33-155.ngrok-free.app")
+#             | StrOutputParser()
+#         )
 
-        # Run the chain
-        answer = rag_chain.invoke(question)
+#         # Run the chain
+#         answer = rag_chain.invoke(question)
 
-        logger.debug(f"Generated answer: {answer}")
+#         logger.debug(f"Generated answer: {answer}")
 
-        return JsonResponse({"questionType": question_type, "questionCategory": question_category, "answer": answer})
+#         return JsonResponse({"questionType": question_type, "questionCategory": question_category, "answer": answer})
 
-    return HttpResponse("Invalid request", status=400)
+#     return HttpResponse("Invalid request", status=400)
 
 
 # Delete APIs
