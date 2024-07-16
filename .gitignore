@@ -11,6 +11,12 @@ db.sqlite3-journal
 media
 secrets.json
 
+# rag local model testing
+vectorstore
+rag.py
+rag2.py
+preprint-웹서비스 기획서.pdf
+
 ### Django.Python Stack ###
 # Byte-compiled / optimized / DLL files
 *.py[cod]
