@@ -10,11 +10,11 @@ class Document1(models.Model):
     ]
     title = models.CharField(max_length=200)
     content = models.TextField()
-    part = models.IntegerField()
+    page = models.IntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     def __str__(self):
-        return f"{self.title} (Part {self.part})"
+        return f"{self.title} (Part {self.page})"
     
 class Document2(models.Model):
     CATEGORY_CHOICES = [
@@ -26,11 +26,11 @@ class Document2(models.Model):
     ]
     title = models.CharField(max_length=200)
     content = models.TextField()
-    part = models.IntegerField()
+    page = models.IntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     def __str__(self):
-        return f"{self.title} (Part {self.part})"
+        return f"{self.title} (Part {self.page})"
 
 class Document3(models.Model):
     CATEGORY_CHOICES = [
@@ -42,8 +42,8 @@ class Document3(models.Model):
     ]
     title = models.CharField(max_length=200)
     content = models.TextField()
-    part = models.IntegerField()
+    page = models.IntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     def __str__(self):
-        return f"{self.title} (Part {self.part})"
+        return f"{self.title} (Part {self.page})"

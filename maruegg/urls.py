@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path("", views.main, name="main"),
     path("upload_html/", views.upload_html, name="upload_html"),
+    path("upload_pdf/", views.upload_pdf, name="upload_pdf"),
     path("ask_question_api/", views.ask_question_api, name="ask_question_api"),
     # path("ask_question_model/", views.ask_question_model, name="ask_question_model"),
     # delete APIs
@@ -14,4 +15,7 @@ urlpatterns = [
     path("retrieve_documents_all/", views.retrieve_documents_all, name="retrieve_documents_all"),
     path("retrieve_documents_by_type/", views.retrieve_documents_by_type, name="retrieve_documents_by_type"),
     path("retrieve_documents_by_type_and_category/", views.retrieve_documents_by_type_and_category, name="retrieve_documents_by_type_and_category"),
+    # test
+    path("upload_html_show/", views.upload_html_show, name="upload_html_show"),
+
 ]
