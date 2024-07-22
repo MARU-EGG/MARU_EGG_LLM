@@ -9,7 +9,7 @@ from django.contrib import admin
 from .models import Document1, Document2, Document3
 
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('title', 'part', 'category', 'created_at')
+    list_display = ('title', 'page', 'category', 'created_at')
     list_filter = ('category',)
 
 admin.site.register(Document1, DocumentAdmin)
