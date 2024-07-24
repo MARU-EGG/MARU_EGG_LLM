@@ -311,10 +311,14 @@ def ask_question_api(request):
         if question_category == "":
             question_category = references[0]['category']
 
+        # 환경에 따라 base_url 설정
+        base_url = "http://127.0.0.1:8000" if settings.DEBUG else "http://3.37.12.249"
+
+        # references를 title과 link로 변환
         references_response = [
             {
                 "title": ref['title'],
-                "link": f"http://127.0.0.1:8000/media/documents/{ref['title']}#page={ref['page']}"
+                "link": f"{base_url}/media/documents/{ref['title']}#page={ref['page']}"
             } for ref in references
         ]
 
