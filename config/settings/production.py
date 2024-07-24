@@ -4,6 +4,10 @@ DEBUG = False
 
 ALLOWED_HOSTS = ['3.37.12.249', 'localhost']
 
+CSRF_TRUSTED_ORIGINS = [
+    'http://3.37.12.249',
+]
+
 DJANGO_APPS+=[]
 PROJECT_APPS+=[]
 THIRD_PARTY_APPS+=[]
