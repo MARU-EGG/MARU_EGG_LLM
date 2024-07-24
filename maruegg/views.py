@@ -1,24 +1,23 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from bs4 import BeautifulSoup
-from openai import OpenAI
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from .models import Document1, Document2, Document3
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
-import tempfile
-import os
-import numpy as np
-import time
-import logging
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.decorators import parser_classes
 from rest_framework.parsers import FormParser
+from drf_yasg import openapi
+from bs4 import BeautifulSoup
+from openai import OpenAI
+import tempfile
+import os
+import time
+import logging
 import fitz
 import camelot
 
@@ -26,8 +25,21 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
+MEDIA_DOCUMENT_URL = os.path.join(settings.MEDIA_ROOT, 'documents')
+
+def pdf_link(request, page=1):
+    pdf_url = os.path.join(settings.MEDIA_URL, 'files/2024정시모집요강.pdf')
+    return render(request, 'maruegg/pdf_link.html', {'pdf_url': pdf_url, 'page': page})
+
+def pdf_direct_link(request, page):
+    pdf_url = os.path.join(settings.MEDIA_URL, 'files/2024정시모집요강.pdf')
+    full_url = f"{pdf_url}#page={page}"
+    logger.debug(f"Redirect page: {full_url}")
+    return redirect(full_url)
+
 def main(request):
     return render(request, "maruegg/upload_html_file.html")
+
 
 @swagger_auto_schema(
     method='post',
@@ -70,10 +82,8 @@ def upload_html(request):
         html_file = request.FILES["html_file"]
         doc_type = request.POST.get("type")
         doc_category = request.POST.get("category")
-
         if doc_type not in ["수시", "정시", "편입학"]:
             return JsonResponse({"error": "Invalid type provided"}, status=400)
-        
         if doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
             return JsonResponse({"error": "Invalid category provided"}, status=400)
 
@@ -84,19 +94,25 @@ def upload_html(request):
             model_class = Document2
         elif doc_type == "편입학":
             model_class = Document3
+            
+        # 파일 이름을 type_category로 변환
+        filename = f"{doc_type}_{doc_category}.html"
 
         with tempfile.NamedTemporaryFile(delete=False, suffix='.html') as temp_file:
             temp_file.write(html_file.read())
             temp_file_path = temp_file.name
-
+        
         try:
+            save_file(html_file, filename)
+
             logger.debug(f"Deleting documents from {model_class.__name__} in the database with category {doc_category}")
             model_class.objects.filter(category=doc_category).delete()
 
             with open(temp_file_path, 'r', encoding='utf-8') as file:
                 soup = BeautifulSoup(file, 'html.parser')
 
-            title = html_file.name
+            # title을 바꾼 파일 이름으로 설정
+            title = filename
             tables = soup.find_all('table')
             for page_num, table in enumerate(tables, start=1):
                 rows = table.find_all('tr')
@@ -118,21 +134,6 @@ def upload_html(request):
             os.remove(temp_file_path)
         return render(request, "maruegg/upload_html_file.html", {"message": "Document uploaded and parsed successfully"})
     return HttpResponse("Invalid request", status=400)
-
-def split_text(text, max_length=1000):
-    paragraphs = text.split('\n')
-    chunks = []
-    current_chunk = []
-    for paragraph in paragraphs:
-        if len('\n'.join(current_chunk + [paragraph])) <= max_length:
-            current_chunk.append(paragraph)
-        else:
-            chunks.append('\n'.join(current_chunk))
-            current_chunk = [paragraph]
-
-    if current_chunk:
-        chunks.append('\n'.join(current_chunk))
-    return chunks
 
 @swagger_auto_schema(
     method='post',
@@ -175,10 +176,8 @@ def upload_pdf(request):
         pdf_file = request.FILES["pdf_file"]
         doc_type = request.POST.get("type")
         doc_category = request.POST.get("category")
-
         if doc_type not in ["수시", "정시", "편입학"]:
             return JsonResponse({"error": "Invalid type provided"}, status=400)
-        
         if doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
             return JsonResponse({"error": "Invalid category provided"}, status=400)
 
@@ -190,35 +189,35 @@ def upload_pdf(request):
         elif doc_type == "편입학":
             model_class = Document3
 
+        # 파일 이름을 type_category로 변환
+        filename = f"{doc_type}_{doc_category}.pdf"
+
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
             for chunk in pdf_file.chunks():
                 temp_file.write(chunk)
             temp_file_path = temp_file.name
 
         try:
+            save_file(pdf_file, filename)
+
             logger.debug(f"Deleting documents from {model_class.__name__} in the database with category {doc_category}")
             model_class.objects.filter(category=doc_category).delete()
-
-            # PDF 파일 열기
             pdf_document = fitz.open(temp_file_path)
 
-            title = pdf_file.name
+            # title을 바꾼 파일 이름으로 설정
+            title = filename
             for page_num in range(len(pdf_document)):
                 page = pdf_document.load_page(page_num)
                 page_text = page.get_text("text")
-
-                # 공백 라인을 제거하고 라인들을 연결하여 텍스트를 정리
                 page_lines = [line.strip() for line in page_text.split('\n') if line.strip()]
                 page_text = ' '.join(page_lines)
 
-                # 페이지에서 표 추출
                 tables = camelot.read_pdf(temp_file_path, pages=str(page_num+1), flavor='stream')
                 if tables:
                     for table in tables:
                         table_text = table.df.to_csv(index=False)
                         page_text += '\n' + table_text
 
-                # 페이지 텍스트를 하나의 레코드로 저장
                 model_class.objects.create(
                     title=title,
                     content=page_text,
@@ -230,6 +229,7 @@ def upload_pdf(request):
             os.remove(temp_file_path)
         return render(request, "maruegg/upload_html_file.html", {"message": "Document uploaded and parsed successfully"})
     return HttpResponse("Invalid request", status=400)
+
 
 @swagger_auto_schema(
     method='post',
@@ -311,11 +311,18 @@ def ask_question_api(request):
         if question_category == "":
             question_category = references[0]['category']
 
+        references_response = [
+            {
+                "title": ref['title'],
+                "link": f"http://127.0.0.1:8000/media/documents/{ref['title']}#page={ref['page']}"
+            } for ref in references
+        ]
+
         return JsonResponse({
             "questionType": question_type, 
             "questionCategory": question_category, 
             "answer": answer,
-            "references": references
+            "references": references_response
         })
 
     return render(request, "maruegg/ask_question.html")
@@ -337,8 +344,8 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
     if not documents.exists():
         return "", []
 
-    doc_contents = [(doc.content, doc.page, doc.category) for doc in documents]
-    contents = [content for content, _, _ in doc_contents]
+    doc_contents = [(doc.title, doc.content, doc.page, doc.category) for doc in documents]
+    contents = [content for _, content, _, _ in doc_contents]
     vectorizer = TfidfVectorizer().fit_transform([question] + contents)
     vectors = vectorizer.toarray()
 
@@ -348,10 +355,11 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
     top_indices = scores.argsort()[-max_docs:][::-1]
     relevant_docs = [doc_contents[i] for i in top_indices]
     
-    context = "\n\n".join([content for content, _, _ in relevant_docs])
-    references = [{"content": content, "page": page, "category": category} for content, page, category in relevant_docs]
+    context = "\n\n".join([content for _, content, _, _ in relevant_docs])
+    references = [{"title": title, "page": page, "category": category} for title, _, page, category in relevant_docs]
     
     return context, references
+
 
 
 # Delete APIs
@@ -390,10 +398,8 @@ def delete_documents_all(request):
 @api_view(['DELETE'])
 def delete_documents_by_type(request):
     doc_type = request.GET.get("type")
-
     if doc_type not in ["수시", "정시", "편입학"]:
         return JsonResponse({"error": "Invalid type provided"}, status=400)
-
     model_class = None
     if doc_type == "수시":
         model_class = Document1
@@ -401,10 +407,8 @@ def delete_documents_by_type(request):
         model_class = Document2
     elif doc_type == "편입학":
         model_class = Document3
-
     model_class.objects.all().delete()
     return JsonResponse({"message": f"All {doc_type} documents deleted successfully"}, status=200)
-
 
 @swagger_auto_schema(
     method='delete',
@@ -434,13 +438,10 @@ def delete_documents_by_type(request):
 def delete_documents_by_type_and_category(request):
     doc_type = request.GET.get("type")
     doc_category = request.GET.get("category")
-
     if doc_type not in ["수시", "정시", "편입학"]:
         return JsonResponse({"error": "Invalid type provided"}, status=400)
-
     if doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
         return JsonResponse({"error": "Invalid category provided"}, status=400)
-
     model_class = None
     if doc_type == "수시":
         model_class = Document1
@@ -448,7 +449,6 @@ def delete_documents_by_type_and_category(request):
         model_class = Document2
     elif doc_type == "편입학":
         model_class = Document3
-
     model_class.objects.filter(category=doc_category).delete()
     return JsonResponse({"message": f"All {doc_type} documents in category {doc_category} deleted successfully"}, status=200)
 
@@ -465,9 +465,7 @@ def retrieve_documents_all(request):
     documents1 = list(Document1.objects.all().values())
     documents2 = list(Document2.objects.all().values())
     documents3 = list(Document3.objects.all().values())
-
     return JsonResponse({"documents1": documents1, "documents2": documents2, "documents3": documents3}, status=200)
-
 
 @swagger_auto_schema(
     method='get',
@@ -488,10 +486,8 @@ def retrieve_documents_all(request):
 @api_view(['GET'])
 def retrieve_documents_by_type(request):
     doc_type = request.GET.get("type")
-
     if doc_type not in ["수시", "정시", "편입학"]:
         return JsonResponse({"error": "Invalid type provided"}, status=400)
-
     model_class = None
     if doc_type == "수시":
         documents = list(Document1.objects.all().values())
@@ -499,7 +495,6 @@ def retrieve_documents_by_type(request):
         documents = list(Document2.objects.all().values())
     elif doc_type == "편입학":
         documents = list(Document3.objects.all().values())
-
     return JsonResponse({"documents": documents}, status=200)
 
 
@@ -531,13 +526,10 @@ def retrieve_documents_by_type(request):
 def retrieve_documents_by_type_and_category(request):
     doc_type = request.GET.get("type")
     doc_category = request.GET.get("category")
-
     if doc_type not in ["수시", "정시", "편입학"]:
         return JsonResponse({"error": "Invalid type provided"}, status=400)
-
     if doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
         return JsonResponse({"error": "Invalid category provided"}, status=400)
-
     model_class = None
     if doc_type == "수시":
         documents = list(Document1.objects.filter(category=doc_category).values())
@@ -545,9 +537,9 @@ def retrieve_documents_by_type_and_category(request):
         documents = list(Document2.objects.filter(category=doc_category).values())
     elif doc_type == "편입학":
         documents = list(Document3.objects.filter(category=doc_category).values())
-
     return JsonResponse({"documents": documents}, status=200)
 
+# main source
 def upload_html_show(request):
     if request.method == "GET":
         return render(request, "maruegg/upload_html_file.html")
@@ -556,7 +548,6 @@ def upload_html_show(request):
         with tempfile.NamedTemporaryFile(delete=False, suffix='.html') as temp_file:
             temp_file.write(html_file.read())
             temp_file_path = temp_file.name
-
         try:
             with open(temp_file_path, 'r', encoding='utf-8') as file:
                 soup = BeautifulSoup(file, 'html.parser')
@@ -570,10 +561,16 @@ def upload_html_show(request):
                     row_text = "\t".join(cell.get_text(strip=True) for cell in cells)
                     tables_text += row_text + "\n"
                 tables_text += "\n"
-
         finally:
             os.remove(temp_file_path)
-
         return render(request, "maruegg/upload_html_file.html", {"tables_text": tables_text})
-
     return HttpResponse("Invalid request", status=400)
+
+def save_file(file, filename):
+    file_path = os.path.join(MEDIA_DOCUMENT_URL, filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+    with open(file_path, 'wb') as destination:
+        for chunk in file.chunks():
+            destination.write(chunk)
+    return file_path
