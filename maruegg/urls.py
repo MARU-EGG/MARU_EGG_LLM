@@ -4,7 +4,6 @@ from . import views
 urlpatterns = [
     # main
     path("", views.main, name="main"),
-    path("upload_html/", views.upload_html, name="upload_html"),
     path("upload_pdf/", views.upload_pdf, name="upload_pdf"),
     path("ask_question_api/", views.ask_question_api, name="ask_question_api"),
     # delete APIs

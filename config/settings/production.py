@@ -2,10 +2,13 @@ from .base import *
 
 DEBUG = False
 
-ALLOWED_HOSTS = ['3.37.12.249', 'localhost']
+ALLOWED_HOSTS = ['3.37.12.249', 'localhost', 'http://3.37.12.249', 'https://3.37.12.249', 'http://marueggllmserver.com', 'https://marueggllmserver.com']
 
 CSRF_TRUSTED_ORIGINS = [
     'http://3.37.12.249',
+    'https://3.37.12.249', 
+    'http://marueggllmserver.com', 
+    'https://marueggllmserver.com'
 ]
 
 DJANGO_APPS+=[]
