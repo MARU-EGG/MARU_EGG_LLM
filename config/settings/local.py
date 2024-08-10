@@ -4,6 +4,7 @@ from .base import *
 DEBUG = True
 
 ALLOWED_HOSTS = []
+CSRF_TRUSTED_ORIGINS = ['http://localhost', 'http://127.0.0.1']
 
 DJANGO_APPS+=[]
 PROJECT_APPS+=[]
