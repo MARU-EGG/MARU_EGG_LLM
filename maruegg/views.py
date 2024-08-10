@@ -78,7 +78,6 @@ def upload_pdf(request):
         if doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
             return JsonResponse({"error": "Invalid category provided"}, status=400)
 
-        # 데이터베이스에서 기존 데이터를 삭제
         model_class = None
         if doc_type == "수시":
             model_class = Document1
@@ -90,7 +89,6 @@ def upload_pdf(request):
         logger.debug(f"Deleting documents from {model_class.__name__} in the database with category {doc_category}")
         model_class.objects.filter(category=doc_category).delete()
 
-        # 파일 저장
         filename = f"{doc_type}_{doc_category}.pdf"
         save_file(pdf_file, filename)
 
