@@ -26,16 +26,8 @@ logger = logging.getLogger(__name__)
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 MEDIA_DOCUMENT_URL = os.path.join(settings.MEDIA_ROOT, 'documents')
+MEDIA_FILES_URL = os.path.join(settings.MEDIA_ROOT, 'files')
 
-def pdf_link(request, page=1):
-    pdf_url = os.path.join(settings.MEDIA_URL, 'files/2024정시모집요강.pdf')
-    return render(request, 'maruegg/pdf_link.html', {'pdf_url': pdf_url, 'page': page})
-
-def pdf_direct_link(request, page):
-    pdf_url = os.path.join(settings.MEDIA_URL, 'files/2024정시모집요강.pdf')
-    full_url = f"{pdf_url}#page={page}"
-    logger.debug(f"Redirect page: {full_url}")
-    return redirect(full_url)
 
 def main(request):
     return render(request, "maruegg/upload_html_file.html")
@@ -94,8 +86,7 @@ def upload_html(request):
             model_class = Document2
         elif doc_type == "편입학":
             model_class = Document3
-            
-        # 파일 이름을 type_category로 변환
+
         filename = f"{doc_type}_{doc_category}.html"
 
         with tempfile.NamedTemporaryFile(delete=False, suffix='.html') as temp_file:
@@ -111,7 +102,6 @@ def upload_html(request):
             with open(temp_file_path, 'r', encoding='utf-8') as file:
                 soup = BeautifulSoup(file, 'html.parser')
 
-            # title을 바꾼 파일 이름으로 설정
             title = filename
             tables = soup.find_all('table')
             for page_num, table in enumerate(tables, start=1):
@@ -189,7 +179,6 @@ def upload_pdf(request):
         elif doc_type == "편입학":
             model_class = Document3
 
-        # 파일 이름을 type_category로 변환
         filename = f"{doc_type}_{doc_category}.pdf"
 
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
@@ -204,7 +193,6 @@ def upload_pdf(request):
             model_class.objects.filter(category=doc_category).delete()
             pdf_document = fitz.open(temp_file_path)
 
-            # title을 바꾼 파일 이름으로 설정
             title = filename
             for page_num in range(len(pdf_document)):
                 page = pdf_document.load_page(page_num)
@@ -295,12 +283,29 @@ def ask_question_api(request):
         
         start_time = time.time()
         
+        # response = client.chat.completions.create(
+        #     model="gpt-4o-mini",
+        #     messages=[
+        #         {"role": "system", "content": "You are a helpful assistant."},
+        #         {"role": "user", "content": f"Context: {context}\n\nQ: {question}\nA:"}
+        #     ]
+        # )
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": f"Context: {context}\n\nQ: {question}\nA:"}
-            ]
+                {
+                    "role": "user", 
+                    "content": (
+                        f"Context: {context}\n\n"
+                        f"Q: {question}\n"
+                        "A: Please provide a helpful and relevant answer based only on the provided context. "
+                        "If the context does not contain sufficient information to answer the question accurately, "
+                        "respond with '해당 내용에 대한 정보는 존재하지 않습니다. 정확한 내용은 입학지원팀에 문의해주세요.'."
+                    )
+                }
+            ],
+            max_tokens=150
         )
         end_time = time.time()
         completion_time = end_time - start_time
@@ -311,10 +316,8 @@ def ask_question_api(request):
         if question_category == "":
             question_category = references[0]['category']
 
-        # 환경에 따라 base_url 설정
         base_url = "http://127.0.0.1:8000" if settings.DEBUG else "http://3.37.12.249"
 
-        # references를 title과 link로 변환
         references_response = [
             {
                 "title": ref['title'],
@@ -331,7 +334,7 @@ def ask_question_api(request):
 
     return render(request, "maruegg/ask_question.html")
 
-def get_relevant_documents(question_type, question_category, question, max_docs=3):
+def get_relevant_documents(question_type, question_category, question, max_docs=5):
     model_class = None
     if question_type == "수시":
         model_class = Document1
@@ -365,64 +368,16 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
     return context, references
 
 
-
 # Delete APIs
 @swagger_auto_schema(
     method='delete',
-    operation_description="DB내 모든 데이터를 삭제합니다.",
-    responses={200: "Success", 400: "Invalid request"}
-)
-@csrf_exempt
-@api_view(['DELETE'])
-def delete_documents_all(request):
-    if request.method == 'DELETE':
-        Document1.objects.all().delete()
-        Document2.objects.all().delete()
-        Document3.objects.all().delete()
-        return JsonResponse({"message": "All documents deleted successfully"}, status=200)
-    return JsonResponse({"error": "Invalid request"}, status=400)
-
-
-@swagger_auto_schema(
-    method='delete',
-    operation_description="DB내 특정 type의 데이터를 삭제합니다.",
+    operation_description="DB내 데이터를 삭제합니다. (특정 type, category별 또는 전체)",
     manual_parameters=[
         openapi.Parameter(
             'type',
             openapi.IN_QUERY,
             description='Type of the documents to delete (수시, 정시, 편입학)',
-            required=True,
-            type=openapi.TYPE_STRING,
-            enum=['수시', '정시', '편입학']
-        ),
-    ],
-    responses={200: "Success", 400: "Invalid request"}
-)
-@csrf_exempt
-@api_view(['DELETE'])
-def delete_documents_by_type(request):
-    doc_type = request.GET.get("type")
-    if doc_type not in ["수시", "정시", "편입학"]:
-        return JsonResponse({"error": "Invalid type provided"}, status=400)
-    model_class = None
-    if doc_type == "수시":
-        model_class = Document1
-    elif doc_type == "정시":
-        model_class = Document2
-    elif doc_type == "편입학":
-        model_class = Document3
-    model_class.objects.all().delete()
-    return JsonResponse({"message": f"All {doc_type} documents deleted successfully"}, status=200)
-
-@swagger_auto_schema(
-    method='delete',
-    operation_description="DB내 특정 type & category의 데이터를 삭제합니다.",
-    manual_parameters=[
-        openapi.Parameter(
-            'type',
-            openapi.IN_QUERY,
-            description='Type of the documents to delete (수시, 정시, 편입학)',
-            required=True,
+            required=False,
             type=openapi.TYPE_STRING,
             enum=['수시', '정시', '편입학']
         ),
@@ -430,7 +385,7 @@ def delete_documents_by_type(request):
             'category',
             openapi.IN_QUERY,
             description='Category of the documents to delete (모집요강, 입시결과, 기출문제, 대학생활, 면접/실기)',
-            required=True,
+            required=False,
             type=openapi.TYPE_STRING,
             enum=['모집요강', '입시결과', '기출문제', '대학생활', '면접/실기']
         ),
@@ -439,78 +394,47 @@ def delete_documents_by_type(request):
 )
 @csrf_exempt
 @api_view(['DELETE'])
-def delete_documents_by_type_and_category(request):
+def delete_documents(request):
     doc_type = request.GET.get("type")
     doc_category = request.GET.get("category")
-    if doc_type not in ["수시", "정시", "편입학"]:
+    
+    model_classes = {
+        "수시": Document1,
+        "정시": Document2,
+        "편입학": Document3
+    }
+    
+    if doc_type and doc_type not in model_classes:
         return JsonResponse({"error": "Invalid type provided"}, status=400)
-    if doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
+    
+    if doc_category and doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
         return JsonResponse({"error": "Invalid category provided"}, status=400)
-    model_class = None
-    if doc_type == "수시":
-        model_class = Document1
-    elif doc_type == "정시":
-        model_class = Document2
-    elif doc_type == "편입학":
-        model_class = Document3
-    model_class.objects.filter(category=doc_category).delete()
-    return JsonResponse({"message": f"All {doc_type} documents in category {doc_category} deleted successfully"}, status=200)
-
+    
+    if doc_type:
+        model_class = model_classes[doc_type]
+        queryset = model_class.objects.all()
+        if doc_category:
+            queryset = queryset.filter(category=doc_category)
+        queryset.delete()
+    else:
+        for model_class in model_classes.values():
+            queryset = model_class.objects.all()
+            if doc_category:
+                queryset = queryset.filter(category=doc_category)
+            queryset.delete()
+    
+    return JsonResponse({"message": "Documents deleted successfully"}, status=200)
 
 # Retrieve APIs
 @swagger_auto_schema(
     method='get',
-    operation_description="DB내 모든 데이터를 반환합니다.",
-    responses={200: "Success", 400: "Invalid request"}
-)
-@csrf_exempt
-@api_view(['GET'])
-def retrieve_documents_all(request):
-    documents1 = list(Document1.objects.all().values())
-    documents2 = list(Document2.objects.all().values())
-    documents3 = list(Document3.objects.all().values())
-    return JsonResponse({"documents1": documents1, "documents2": documents2, "documents3": documents3}, status=200)
-
-@swagger_auto_schema(
-    method='get',
-    operation_description="DB내 특정 type의 데이터를 반환합니다.",
+    operation_description="DB내 데이터를 반환합니다. (특정 type, category별 또는 전체)",
     manual_parameters=[
         openapi.Parameter(
             'type',
             openapi.IN_QUERY,
             description='Type of the documents to retrieve (수시, 정시, 편입학)',
-            required=True,
-            type=openapi.TYPE_STRING,
-            enum=['수시', '정시', '편입학']
-        ),
-    ],
-    responses={200: "Success", 400: "Invalid request"}
-)
-@csrf_exempt
-@api_view(['GET'])
-def retrieve_documents_by_type(request):
-    doc_type = request.GET.get("type")
-    if doc_type not in ["수시", "정시", "편입학"]:
-        return JsonResponse({"error": "Invalid type provided"}, status=400)
-    model_class = None
-    if doc_type == "수시":
-        documents = list(Document1.objects.all().values())
-    elif doc_type == "정시":
-        documents = list(Document2.objects.all().values())
-    elif doc_type == "편입학":
-        documents = list(Document3.objects.all().values())
-    return JsonResponse({"documents": documents}, status=200)
-
-
-@swagger_auto_schema(
-    method='get',
-    operation_description="DB내 특정 type & category의 데이터를 반환합니다.",
-    manual_parameters=[
-        openapi.Parameter(
-            'type',
-            openapi.IN_QUERY,
-            description='Type of the documents to retrieve (수시, 정시, 편입학)',
-            required=True,
+            required=False,
             type=openapi.TYPE_STRING,
             enum=['수시', '정시', '편입학']
         ),
@@ -518,7 +442,7 @@ def retrieve_documents_by_type(request):
             'category',
             openapi.IN_QUERY,
             description='Category of the documents to retrieve (모집요강, 입시결과, 기출문제, 대학생활, 면접/실기)',
-            required=True,
+            required=False,
             type=openapi.TYPE_STRING,
             enum=['모집요강', '입시결과', '기출문제', '대학생활', '면접/실기']
         ),
@@ -527,20 +451,36 @@ def retrieve_documents_by_type(request):
 )
 @csrf_exempt
 @api_view(['GET'])
-def retrieve_documents_by_type_and_category(request):
+def retrieve_documents(request):
     doc_type = request.GET.get("type")
     doc_category = request.GET.get("category")
-    if doc_type not in ["수시", "정시", "편입학"]:
+    
+    model_classes = {
+        "수시": Document1,
+        "정시": Document2,
+        "편입학": Document3
+    }
+    
+    if doc_type and doc_type not in model_classes:
         return JsonResponse({"error": "Invalid type provided"}, status=400)
-    if doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
+    
+    if doc_category and doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
         return JsonResponse({"error": "Invalid category provided"}, status=400)
-    model_class = None
-    if doc_type == "수시":
-        documents = list(Document1.objects.filter(category=doc_category).values())
-    elif doc_type == "정시":
-        documents = list(Document2.objects.filter(category=doc_category).values())
-    elif doc_type == "편입학":
-        documents = list(Document3.objects.filter(category=doc_category).values())
+    
+    documents = {}
+    if doc_type:
+        model_class = model_classes[doc_type]
+        queryset = model_class.objects.all()
+        if doc_category:
+            queryset = queryset.filter(category=doc_category)
+        documents[doc_type] = list(queryset.values())
+    else:
+        for doc_type, model_class in model_classes.items():
+            queryset = model_class.objects.all()
+            if doc_category:
+                queryset = queryset.filter(category=doc_category)
+            documents[doc_type] = list(queryset.values())
+    
     return JsonResponse({"documents": documents}, status=200)
 
 # main source
