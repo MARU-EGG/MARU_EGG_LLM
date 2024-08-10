@@ -32,99 +32,6 @@ MEDIA_FILES_URL = os.path.join(settings.MEDIA_ROOT, 'files')
 def main(request):
     return render(request, "maruegg/upload_html_file.html")
 
-
-@swagger_auto_schema(
-    method='post',
-    operation_description="LLM모델이 답변할 기반이 되는 html파일 업로드 api입니다. type, category에 따라 db에 저장되는 위치가 달라집니다.",
-    manual_parameters=[
-        openapi.Parameter(
-            'type',
-            openapi.IN_FORM,
-            description='Type of the document (수시, 정시, 편입학)',
-            required=True,
-            type=openapi.TYPE_STRING,
-            enum=['수시', '정시', '편입학']
-        ),
-        openapi.Parameter(
-            'category',
-            openapi.IN_FORM,
-            description='Category of the document (모집요강, 입시결과, 기출문제, 대학생활, 면접/실기)',
-            required=True,
-            type=openapi.TYPE_STRING,
-            enum=['모집요강', '입시결과', '기출문제', '대학생활', '면접/실기']
-        ),
-        openapi.Parameter(
-            'html_file',
-            openapi.IN_FORM,
-            description='HTML file to be uploaded',
-            required=True,
-            type=openapi.TYPE_FILE
-        ),
-    ],
-    responses={
-        200: openapi.Response(description="Success"),
-        400: openapi.Response(description="Invalid request"),
-    }
-)
-@csrf_exempt
-@api_view(['POST'])
-@parser_classes([MultiPartParser, FormParser])
-def upload_html(request):
-    if request.method == "POST" and 'html_file' in request.FILES:
-        html_file = request.FILES["html_file"]
-        doc_type = request.POST.get("type")
-        doc_category = request.POST.get("category")
-        if doc_type not in ["수시", "정시", "편입학"]:
-            return JsonResponse({"error": "Invalid type provided"}, status=400)
-        if doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
-            return JsonResponse({"error": "Invalid category provided"}, status=400)
-
-        model_class = None
-        if doc_type == "수시":
-            model_class = Document1
-        elif doc_type == "정시":
-            model_class = Document2
-        elif doc_type == "편입학":
-            model_class = Document3
-
-        filename = f"{doc_type}_{doc_category}.html"
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.html') as temp_file:
-            temp_file.write(html_file.read())
-            temp_file_path = temp_file.name
-        
-        try:
-            save_file(html_file, filename)
-
-            logger.debug(f"Deleting documents from {model_class.__name__} in the database with category {doc_category}")
-            model_class.objects.filter(category=doc_category).delete()
-
-            with open(temp_file_path, 'r', encoding='utf-8') as file:
-                soup = BeautifulSoup(file, 'html.parser')
-
-            title = filename
-            tables = soup.find_all('table')
-            for page_num, table in enumerate(tables, start=1):
-                rows = table.find_all('tr')
-                page_text = ""
-                for row in rows:
-                    cells = row.find_all(['td', 'th'])
-                    row_text = "\t".join(cell.get_text(strip=True) for cell in cells)
-                    page_text += row_text + "\n"
-                page_text += "\n"
-
-                model_class.objects.create(
-                    title=title,
-                    content=page_text,
-                    page=page_num,
-                    category=doc_category
-                )
-                logger.debug(f"Document from page {page_num} created with content: {page_text[:100]}...")
-        finally:
-            os.remove(temp_file_path)
-        return render(request, "maruegg/upload_html_file.html", {"message": "Document uploaded and parsed successfully"})
-    return HttpResponse("Invalid request", status=400)
-
 @swagger_auto_schema(
     method='post',
     operation_description="LLM모델이 답변할 기반이 되는 pdf 파일 업로드 api입니다. type, category에 따라 db에 저장되는 위치가 달라집니다.",
@@ -171,6 +78,7 @@ def upload_pdf(request):
         if doc_category not in ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]:
             return JsonResponse({"error": "Invalid category provided"}, status=400)
 
+        # 데이터베이스에서 기존 데이터를 삭제
         model_class = None
         if doc_type == "수시":
             model_class = Document1
@@ -179,43 +87,15 @@ def upload_pdf(request):
         elif doc_type == "편입학":
             model_class = Document3
 
+        logger.debug(f"Deleting documents from {model_class.__name__} in the database with category {doc_category}")
+        model_class.objects.filter(category=doc_category).delete()
+
+        # 파일 저장
         filename = f"{doc_type}_{doc_category}.pdf"
+        save_file(pdf_file, filename)
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
-            for chunk in pdf_file.chunks():
-                temp_file.write(chunk)
-            temp_file_path = temp_file.name
-
-        try:
-            save_file(pdf_file, filename)
-
-            logger.debug(f"Deleting documents from {model_class.__name__} in the database with category {doc_category}")
-            model_class.objects.filter(category=doc_category).delete()
-            pdf_document = fitz.open(temp_file_path)
-
-            title = filename
-            for page_num in range(len(pdf_document)):
-                page = pdf_document.load_page(page_num)
-                page_text = page.get_text("text")
-                page_lines = [line.strip() for line in page_text.split('\n') if line.strip()]
-                page_text = ' '.join(page_lines)
-
-                tables = camelot.read_pdf(temp_file_path, pages=str(page_num+1), flavor='stream')
-                if tables:
-                    for table in tables:
-                        table_text = table.df.to_csv(index=False)
-                        page_text += '\n' + table_text
-
-                model_class.objects.create(
-                    title=title,
-                    content=page_text,
-                    page=page_num + 1,
-                    category=doc_category
-                )
-                logger.debug(f"Document from page {page_num + 1} created with content: {page_text[:100]}...")
-        finally:
-            os.remove(temp_file_path)
-        return render(request, "maruegg/upload_html_file.html", {"message": "Document uploaded and parsed successfully"})
+        logger.debug(f"PDF file {filename} saved to documents and files folder.")
+        return render(request, "maruegg/upload_html_file.html", {"message": "File uploaded successfully"})
     return HttpResponse("Invalid request", status=400)
 
 
@@ -511,10 +391,20 @@ def upload_html_show(request):
     return HttpResponse("Invalid request", status=400)
 
 def save_file(file, filename):
-    file_path = os.path.join(MEDIA_DOCUMENT_URL, filename)
-    if os.path.exists(file_path):
-        os.remove(file_path)
-    with open(file_path, 'wb') as destination:
+    # Save to documents folder
+    documents_path = os.path.join(MEDIA_DOCUMENT_URL, filename)
+    if os.path.exists(documents_path):
+        os.remove(documents_path)
+    with open(documents_path, 'wb') as destination:
         for chunk in file.chunks():
             destination.write(chunk)
-    return file_path
+
+    # Save to files folder
+    files_path = os.path.join(MEDIA_FILES_URL, filename)
+    if os.path.exists(files_path):
+        os.remove(files_path)
+    with open(files_path, 'wb') as destination:
+        for chunk in file.chunks():
+            destination.write(chunk)
+
+    return documents_path, files_path
