@@ -2,7 +2,7 @@ from .base import *
 
 DEBUG = False
 
-ALLOWED_HOSTS = ['3.37.12.249', 'localhost', 'http://3.37.12.249', 'https://3.37.12.249', 'http://marueggllmserver.com', 'https://marueggllmserver.com']
+ALLOWED_HOSTS = ['3.37.12.249', 'localhost',  'marueggllmserver.com', 'www.marueggllmserver.com']
 
 CSRF_TRUSTED_ORIGINS = [
     'http://3.37.12.249',
