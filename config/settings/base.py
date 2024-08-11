@@ -81,14 +81,14 @@ CORS_ALLOWED_ORIGINS = [
     "https://marueggllmserver.com",
 ]
 
-CORS_ALLOWED_ORIGINS = [
+CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
-    "http://127.0.0.1:8000",
     "http://3.37.12.249",
     "https://3.37.12.249",
     "http://marueggllmserver.com",
     "https://marueggllmserver.com",
 ]
+
 
 ROOT_URLCONF = "config.urls"
 
