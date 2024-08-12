@@ -79,6 +79,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://3.37.12.249",
     "http://marueggllmserver.com",
     "https://marueggllmserver.com",
+    "https://maru-egg-fe.vercel.app",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -87,6 +88,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://3.37.12.249",
     "http://marueggllmserver.com",
     "https://marueggllmserver.com",
+    "https://maru-egg-fe.vercel.app",
 ]
 
 
