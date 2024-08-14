@@ -194,7 +194,7 @@ def ask_question_api(request):
         if question_category == "":
             question_category = references[0]['category']
 
-        base_url = "http://127.0.0.1:8000" if settings.DEBUG else "http://3.37.12.249"
+        base_url = "http://127.0.0.1:8000" if settings.DEBUG else "https://marueggllmserver.com"
 
         references_response = [
             {
