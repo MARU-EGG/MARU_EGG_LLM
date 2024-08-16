@@ -28,7 +28,6 @@ client = OpenAI(api_key=settings.OPENAI_API_KEY)
 MEDIA_DOCUMENT_URL = os.path.join(settings.MEDIA_ROOT, 'documents')
 MEDIA_FILES_URL = os.path.join(settings.MEDIA_ROOT, 'files')
 
-
 def main(request):
     return render(request, "maruegg/upload_html_file.html")
 
@@ -177,14 +176,17 @@ def ask_question_api(request):
                     "content": (
                         f"Context: {context}\n\n"
                         f"Q: {question}\n"
-                        "A: Please provide a helpful and relevant answer based only on the provided context. "
-                        "If the context does not contain sufficient information to answer the question accurately, "
-                        "respond with '해당 내용에 대한 정보는 존재하지 않습니다. 정확한 내용은 입학지원팀에 문의해주세요.'."
+                        "A: Based on the provided context, please answer the question as accurately as possible. "
+                        "If the context does not provide enough information, give a brief, relevant response using only the available details. "
+                        "If you cannot find any relevant information in the context, reply with '해당 내용에 대한 정보는 존재하지 않습니다. "
+                        "정확한 내용은 입학지원팀에 문의해주세요.'."
                     )
                 }
             ],
-            max_tokens=150
+            max_tokens=200,  # 약간 더 길게 설정하여 필요한 경우 더 자세한 답변을 할 수 있도록 허용
+            temperature=0.2  # 모델의 창의성을 낮춰 정확도에 집중
         )
+
         end_time = time.time()
         completion_time = end_time - start_time
         logger.debug(f"OpenAI completion took {completion_time:.2f} seconds")
