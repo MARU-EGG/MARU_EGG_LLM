@@ -1,15 +1,13 @@
 from django.urls import path
-from . import views
+from .views import main, upload_pdf, ask_question_api, delete_documents, retrieve_documents
 
 urlpatterns = [
     # main
-    path("", views.main, name="main"),
-    path("upload_pdf/", views.upload_pdf, name="upload_pdf"),
-    path("ask_question_api/", views.ask_question_api, name="ask_question_api"),
+    path("", main, name="main"),
+    path("upload_pdf/", upload_pdf, name="upload_pdf"),
+    path("ask_question_api/", ask_question_api, name="ask_question_api"),
     # delete APIs
-    path("delete_documents/", views.delete_documents, name="delete_documents"),
+    path("delete_documents/", delete_documents, name="delete_documents"),
     # retrieve APIs
-    path("retrieve_documents/", views.retrieve_documents, name="retrieve_documents"),
-    # test
-    path("upload_html_show/", views.upload_html_show, name="upload_html_show"),
+    path("retrieve_documents/", retrieve_documents, name="retrieve_documents"),
 ]
