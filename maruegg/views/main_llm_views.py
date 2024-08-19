@@ -2,7 +2,6 @@ import os
 import time
 import logging
 import uuid
-from django.shortcuts import render, redirect
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -290,7 +289,7 @@ def ask_question_api(request):
         "references": references_response
     })
 
-def get_relevant_documents(question_type, question_category, question, max_docs=5):
+def get_relevant_documents(question_type, question_category, question, max_docs=3):
     model_class = None
     if question_type == "수시":
         model_class = Document1
@@ -298,6 +297,9 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
         model_class = Document2
     elif question_type == "편입학":
         model_class = Document3
+
+    # 모델 클래스 이름 가져오기
+    class_name = model_class.__name__
 
     # 카테고리 이름을 영어로 변환
     category_mapping = {
@@ -308,7 +310,13 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
         "면접/실기": "interview_practice"
     }
 
-    categories = ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]
+    # question_category가 없는 경우 모든 카테고리에 대해 임베딩 수행
+    if not question_category:
+        categories = ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]
+    else:
+        # question_category가 있는 경우 해당 카테고리만 임베딩 수행
+        categories = [question_category]
+
     retrievers = {}
 
     for category in categories:
@@ -317,10 +325,17 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
         if documents.exists():
             doc_contents = [(doc.title, doc.content, doc.page, doc.category) for doc in documents]
             embedding_function = OpenAIEmbeddings()
+            
+            # 벡터 DB 경로 설정 (클래스 이름별 관리)
+            persist_directory = f"vectorDB/{class_name}/{english_category}_vectorDB"
+            
+            # 디렉토리 자동 생성
+            os.makedirs(persist_directory, exist_ok=True)
+            
             vectorstore = Chroma(
                 collection_name=f"{english_category}_collection",
                 embedding_function=embedding_function,
-                persist_directory=f"vectorDB/{english_category}_vectorDB"
+                persist_directory=persist_directory
             )
             retrievers[category] = create_multi_vector_retriever(vectorstore, doc_contents)
 
