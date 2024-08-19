@@ -50,7 +50,6 @@ def create_multi_vector_retriever(vectorstore, doc_contents):
         id_key=id_key,
     )
 
-    # 기존 문서의 메타데이터와 해시값 가져오기
     existing_metadata = retriever.vectorstore.get(include=["metadatas"])
     existing_hashes = set(
         generate_metadata_hash(metadata) for metadata in existing_metadata["metadatas"]
@@ -65,7 +64,6 @@ def create_multi_vector_retriever(vectorstore, doc_contents):
     new_doc_ids = []
 
     for doc_content in doc_contents:
-        # 메타데이터 해시 생성
         metadata = {
             "title": doc_content[0],
             "page": doc_content[2],
@@ -84,21 +82,17 @@ def create_multi_vector_retriever(vectorstore, doc_contents):
                     metadata=metadata
                 )
             )
-            # 새로운 문서도 추가
             existing_docs.append((doc_id, metadata))
         else:
             logger.debug("Document with similar content already exists. Skipping.")
 
-    # 새로운 문서가 있을 경우 추가하고, 모든 문서를 다시 mset에 저장
     if new_docs:
         retriever.vectorstore.add_documents(new_docs)
-    
-    # 기존 문서와 새로운 문서를 mset에 저장
+
     retriever.docstore.mset(existing_docs)
 
     return retriever
 
-# 문서 텍스트를 추출하는 함수
 def split_text_types(docs):
     texts = []
     for doc in docs:
@@ -109,7 +103,6 @@ def split_text_types(docs):
         texts.append(doc)
     return {"texts": texts}
 
-# 프롬프트 생성 함수
 def prompt_func(data_dict):
     try:
         formatted_texts = "\n".join(str(text) for text in data_dict["context"]["texts"])  # Ensure all items are strings
@@ -118,8 +111,7 @@ def prompt_func(data_dict):
         raise
 
     messages = []
-    
-    # GPT 프롬프트 설정
+
     gpt_prompt = (
         "명지대학교 입학 관련된 상담을 진행하기 위한 챗봇입니다.\n\n"
         "가이드라인:\n"
@@ -142,10 +134,11 @@ def prompt_func(data_dict):
         "(예: 사회적배려대상자전형의 경우 국내 고등학교 졸업(예정)자는 학교생활기록부와 입학원서, 검정고시출신자는 입학원서, "
         "고등학교 졸업학력 검정고시 성적증명서 및 합격증명서, 학교생활기록부 대체서식, 국외고등학교졸업(예정)자는 입학원서와 국외고 성적증명서 및 졸업(예정)증명서, "
         "학교생활기록부 대체 서식이 필요합니다.)\n"
+        "**주어진 정보**만을 기반으로 답변을 생성해야 합니다. **추가적인 정보나 추측**은 절대 포함하지 말아야 합니다.\n"
+        "만약 주어진 정보로 충분한 답변을 제공할 수 없다면, '제공된 정보 내에서 답변할 수 없습니다.'라는 메시지를 반환하세요.\n"
         "모든 대답의 마지막에는 ‘더욱 자세한 상담을 원하시면 명지대학교 입학처 02-300-1799,1800으로 전화주시길 바랍니다.’라는 멘트를 붙여야합니다.\n\n"
     )
-    
-    # 사용자의 질문과 컨텍스트를 포함하는 메시지 생성
+
     text_message = {
         "type": "text",
         "text": (
@@ -165,23 +158,18 @@ def prompt_func(data_dict):
     messages.append(text_message)
     return [HumanMessage(content=messages)]
 
-# 멀티모달 RAG 체인 생성 함수
 def multi_modal_rag_chain(retriever):
-    # LLM 정의
     llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0, max_tokens=500)
 
-    # MultiQueryRetriever 생성
     multi_query_retriever = MultiQueryRetriever.from_llm(
-        retriever=retriever,  # 기존에 정의된 retriever를 사용
+        retriever=retriever,
         llm=llm,
     )
     logging.basicConfig()
     logging.getLogger('langchain.retrievers.multi_query').setLevel(logging.INFO)
 
-    # 멀티모달 LLM
     model = ChatOpenAI(temperature=0, model="gpt-4o-mini", max_tokens=2048)
 
-    # RAG 파이프라인
     chain = (
         {
             "context": multi_query_retriever | RunnableLambda(split_text_types),
@@ -242,7 +230,6 @@ def ask_question_api(request):
     if question_type not in ["수시", "정시", "편입학"]:
         return JsonResponse({"error": "Invalid question type provided"}, status=400)
     
-    # 문서 검색 및 리트리버 가져오기
     start_time = time.time()
     retriever, references = get_relevant_documents(question_type, question_category, question)
     retrieval_time = time.time() - start_time
@@ -252,12 +239,9 @@ def ask_question_api(request):
         logger.debug("No relevant documents found.")
         return JsonResponse({"error": "No relevant documents found"}, status=404)
 
-    # RAG 체인을 사용하여 GPT 응답 생성
     try:
-        # RAG 체인 생성
         chain_multimodal_rag = multi_modal_rag_chain(retriever)
 
-        # 체인을 사용하여 응답 생성
         response = chain_multimodal_rag.invoke({"question": question})
 
         completion_time = time.time() - start_time
@@ -271,10 +255,8 @@ def ask_question_api(request):
         logger.debug("No relevant documents found or no response generated.")
         return JsonResponse({"error": "No relevant documents found"}, status=404)
 
-    # 응답 처리
     answer = response.strip()
 
-    # 참고 정보(예: 문서 링크 등)를 생성하는 부분
     references_response = [
         {
             "title": ref['title'],
@@ -289,7 +271,7 @@ def ask_question_api(request):
         "references": references_response
     })
 
-def get_relevant_documents(question_type, question_category, question, max_docs=3):
+def get_relevant_documents(question_type, question_category, question, max_docs=10):
     model_class = None
     if question_type == "수시":
         model_class = Document1
@@ -298,10 +280,8 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
     elif question_type == "편입학":
         model_class = Document3
 
-    # 모델 클래스 이름 가져오기
     class_name = model_class.__name__
 
-    # 카테고리 이름을 영어로 변환
     category_mapping = {
         "모집요강": "admission_guideline",
         "입시결과": "admission_results",
@@ -310,11 +290,9 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
         "면접/실기": "interview_practice"
     }
 
-    # question_category가 없는 경우 모든 카테고리에 대해 임베딩 수행
     if not question_category:
         categories = ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]
     else:
-        # question_category가 있는 경우 해당 카테고리만 임베딩 수행
         categories = [question_category]
 
     retrievers = {}
@@ -325,11 +303,9 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
         if documents.exists():
             doc_contents = [(doc.title, doc.content, doc.page, doc.category) for doc in documents]
             embedding_function = OpenAIEmbeddings()
-            
-            # 벡터 DB 경로 설정 (클래스 이름별 관리)
+
             persist_directory = f"vectorDB/{class_name}/{english_category}_vectorDB"
-            
-            # 디렉토리 자동 생성
+
             os.makedirs(persist_directory, exist_ok=True)
             
             vectorstore = Chroma(
@@ -346,7 +322,6 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
         else:
             return "", []
     else:
-        # 카테고리가 지정되지 않은 경우 모든 리트리버에서 검색
         relevant_docs = []
         for category, retriever in retrievers.items():
             category_docs = retriever.vectorstore.similarity_search_with_score(question, k=3)
@@ -355,13 +330,12 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
     if not relevant_docs:
         return "", []
 
-    # 검색된 문서에서 메타데이터를 추출하여 context 및 references 생성
     references = []
-    for doc in relevant_docs[:max_docs]:
+    for doc in relevant_docs[:5]:
         metadata = doc[0].metadata
         references.append({
-            "title": metadata.get("title", "Unknown Title"),
-            "page": metadata.get("page", "Unknown Page"),
-            "category": metadata.get("category", "Unknown Category")
+        "title": metadata.get("title", "Unknown Title"),
+        "page": metadata.get("page", "Unknown Page"),
+        "category": metadata.get("category", "Unknown Category")
         })
     return retriever, references
