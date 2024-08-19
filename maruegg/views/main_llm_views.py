@@ -257,10 +257,12 @@ def ask_question_api(request):
 
     answer = response.strip()
 
+    base_url = "http://127.0.0.1:8000" if settings.DEBUG else "https://marueggllmserver.com"
+
     references_response = [
         {
             "title": ref['title'],
-            "link": f"http://127.0.0.1:8000/media/documents/{ref['title']}#page={ref['page']}"
+            "link": f"{base_url}/media/documents/{ref['title']}#page={ref['page']}"
         } for ref in references
     ]
 
