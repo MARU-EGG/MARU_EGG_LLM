@@ -21,9 +21,6 @@ from langchain_core.messages import HumanMessage
 from langchain_core.documents import Document
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.chat_models import ChatOpenAI
-from langchain_core.documents import Document
-import uuid
-import hashlib
 
 os.environ['OPENAI_API_KEY'] = settings.OPENAI_API_KEY
 
@@ -43,7 +40,7 @@ def generate_metadata_hash(metadata):
     metadata_string = "".join(str(value) for key, value in sorted(metadata.items()) if key != "doc_id")
     return hashlib.sha256(metadata_string.encode('utf-8')).hexdigest()
 
-def create_multi_vector_retriever(vectorstore, doc_contents, pages_per_chunk=5):
+def create_multi_vector_retriever(vectorstore, doc_contents):
     store = InMemoryStore()
     id_key = "doc_id"
 
@@ -66,21 +63,13 @@ def create_multi_vector_retriever(vectorstore, doc_contents, pages_per_chunk=5):
     new_docs = []
     new_doc_ids = []
 
-    combined_docs = []
-    current_chunk = []
-    current_chunk_metadata = {"title": "", "page": "", "category": ""}
-
-    for i, doc_content in enumerate(doc_contents):
-        current_chunk.append(doc_content[1])
-        if i % pages_per_chunk == 0 or i == len(doc_contents) - 1:
-            combined_text = " ".join(current_chunk)
-            current_chunk_metadata["title"] = doc_content[0]
-            current_chunk_metadata["page"] = f"{i-pages_per_chunk+1}-{i+1}"
-            current_chunk_metadata["category"] = doc_content[3]
-            combined_docs.append((combined_text, current_chunk_metadata.copy()))
-            current_chunk = []
-
-    for combined_text, metadata in combined_docs:
+    for doc_content in doc_contents:
+        metadata = {
+            "title": doc_content[0],
+            "page": doc_content[2],
+            "category": doc_content[3],
+            "content": doc_content[1],
+        }
         doc_hash = generate_metadata_hash(metadata)
 
         if doc_hash not in existing_hashes:
@@ -89,7 +78,7 @@ def create_multi_vector_retriever(vectorstore, doc_contents, pages_per_chunk=5):
             metadata[id_key] = doc_id
             new_docs.append(
                 Document(
-                    page_content=combined_text,
+                    page_content=doc_content[1],
                     metadata=metadata
                 )
             )
@@ -104,7 +93,6 @@ def create_multi_vector_retriever(vectorstore, doc_contents, pages_per_chunk=5):
 
     return retriever
 
-
 def split_text_types(docs):
     texts = []
     for doc in docs:
@@ -117,7 +105,7 @@ def split_text_types(docs):
 
 def prompt_func(data_dict):
     try:
-        formatted_texts = "\n".join(str(text) for text in data_dict["context"]["texts"])
+        formatted_texts = "\n".join(str(text) for text in data_dict["context"]["texts"])  # Ensure all items are strings
     except Exception as e:
         logger.error(f"Error in formatting texts: {e}")
         raise
@@ -287,7 +275,7 @@ def ask_question_api(request):
         "references": references_response
     })
 
-def get_relevant_documents(question_type, question_category, question, max_docs=5):
+def get_relevant_documents(question_type, question_category, question, max_docs=15):
     model_class = None
     if question_type == "수시":
         model_class = Document1
@@ -347,7 +335,7 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
         return "", []
 
     references = []
-    for doc in relevant_docs[:3]:
+    for doc in relevant_docs[:12]:
         metadata = doc[0].metadata
         references.append({
         "title": metadata.get("title", "Unknown Title"),
