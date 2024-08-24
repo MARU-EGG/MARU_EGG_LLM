@@ -275,7 +275,7 @@ def ask_question_api(request):
         "references": references_response
     })
 
-def get_relevant_documents(question_type, question_category, question, max_docs=15):
+def get_relevant_documents(question_type, question_category, question, max_docs=12):
     model_class = None
     if question_type == "수시":
         model_class = Document1
@@ -335,7 +335,7 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
         return "", []
 
     references = []
-    for doc in relevant_docs[:12]:
+    for doc in relevant_docs[:3]:
         metadata = doc[0].metadata
         references.append({
         "title": metadata.get("title", "Unknown Title"),
