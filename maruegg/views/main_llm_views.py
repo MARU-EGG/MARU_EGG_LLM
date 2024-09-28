@@ -170,7 +170,7 @@ def multi_modal_rag_chain(retriever):
     logging.basicConfig()
     logging.getLogger('langchain.retrievers.multi_query').setLevel(logging.INFO)
 
-    model = ChatOpenAI(temperature=0, model="gpt-4o-mini", max_tokens=2048)
+    model = ChatOpenAI(temperature=0, model="gpt-4o", max_tokens=2048)
 
     chain = (
         {
@@ -275,7 +275,7 @@ def ask_question_api(request):
         "references": references_response
     })
 
-def get_relevant_documents(question_type, question_category, question, max_docs=12):
+def get_relevant_documents(question_type, question_category, question, max_docs=5):
     model_class = None
     if question_type == "수시":
         model_class = Document1
