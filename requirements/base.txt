@@ -152,7 +152,6 @@ scipy==1.14.0
 selectivesearch==0.4
 shellingham==1.5.4
 six==1.16.0
-sklearn==0.0.post12
 sniffio==1.3.1
 soupsieve==2.5
 SQLAlchemy==2.0.31
