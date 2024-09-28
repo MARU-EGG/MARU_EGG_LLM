@@ -17,8 +17,8 @@ certifi==2024.7.4
 cffi==1.16.0
 chardet==5.2.0
 charset-normalizer==3.3.2
-chroma-hnswlib==0.7.5
-chromadb==0.5.4
+chroma-hnswlib==0.7.6
+chromadb==0.5.11
 click==8.1.7
 coloredlogs==15.0.1
 cryptography==42.0.8
@@ -67,6 +67,7 @@ jsonpointer==3.0.0
 keras==3.4.1
 kubernetes==30.1.0
 langchain==0.2.14
+langchain-chroma==0.1.4
 langchain-community==0.2.12
 langchain-core==0.2.32
 langchain-text-splitters==0.2.2
@@ -127,8 +128,9 @@ pycparser==2.22
 pydantic==2.8.2
 pydantic_core==2.20.1
 Pygments==2.18.0
-PyMuPDF==1.24.7
-PyMuPDFb==1.24.6
+PyMuPDF==1.24.10
+pymupdf4llm==0.0.14
+PyMuPDFb==1.24.10
 PyPDF2==2.10.5
 pypdfium2==4.30.0
 PyPika==0.48.9
