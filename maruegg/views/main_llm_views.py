@@ -134,6 +134,7 @@ def prompt_func(data_dict):
         "(예: 사회적배려대상자전형의 경우 국내 고등학교 졸업(예정)자는 학교생활기록부와 입학원서, 검정고시출신자는 입학원서, "
         "고등학교 졸업학력 검정고시 성적증명서 및 합격증명서, 학교생활기록부 대체서식, 국외고등학교졸업(예정)자는 입학원서와 국외고 성적증명서 및 졸업(예정)증명서, "
         "학교생활기록부 대체 서식이 필요합니다.)\n"
+        "전형의 지원자격을 묻는 경우 지원자격 전체를 모두 답변해주세요.\n"
         "**주어진 정보**만을 기반으로 답변을 생성해야 합니다. **추가적인 정보나 추측**은 절대 포함하지 말아야 합니다.\n"
         "학생의 성적을 듣고, 환산점수를 계산해주지 않습니다. 대신 성적을 환산할 수 있는 사이트인 https://cs.u-is.co.kr/mju/score/ 로 안내해야합니다.\n\n"
         "일반적으로 성적이 높은 경우 면접이 없는 전형을 추천하고, 성적이 낮은 경우 면접이 있는 전형을 추천합니다.\n\n"
@@ -148,12 +149,12 @@ def prompt_func(data_dict):
             f"## User-provided question:\n**{data_dict['question']}**\n\n"
             "### Text and / or tables:\n"
             f"```\n{formatted_texts}\n```\n\n"
-            "Please provide your answer in the following format:\n"
-            "- **Main Point 1**: Detail...\n"
-            "- **Main Point 2**: Detail...\n"
-            "- **Main Point 2**: Detail...\n"
-            "- **Main Point 2**: Detail...\n"
-            "- **Main Point 2**: Detail...\n"
+            # "Please provide your answer in the following format:\n"
+            # "- **Main Point 1**: Detail...\n"
+            # "- **Main Point 2**: Detail...\n"
+            # "- **Main Point 2**: Detail...\n"
+            # "- **Main Point 2**: Detail...\n"
+            # "- **Main Point 2**: Detail...\n"
         ),
     }
     
