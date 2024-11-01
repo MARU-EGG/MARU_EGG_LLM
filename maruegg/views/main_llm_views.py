@@ -10,7 +10,7 @@ from rest_framework.parsers import FormParser
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from openai import OpenAI
-from ..models import Document1, Document2, Document3
+from ..models import Document1, Document2, Document3, Prompt
 from langchain_community.vectorstores import Chroma
 from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain.retrievers.multi_query import MultiQueryRetriever
@@ -103,44 +103,25 @@ def split_text_types(docs):
         texts.append(doc)
     return {"texts": texts}
 
-def prompt_func(data_dict):
+def prompt_func(data_dict, question_type, question_category):
     try:
-        formatted_texts = "\n".join(str(text) for text in data_dict["context"]["texts"])  # Ensure all items are strings
+        prompt_instance = Prompt.objects.get(
+            question_type=question_type,
+            question_category=question_category
+        )
+        gpt_prompt = prompt_instance.prompt_text
+        print(gpt_prompt)
+    except Prompt.DoesNotExist:
+        logger.error("No prompt found for the given question type and category.")
+        return JsonResponse({"error": "No prompt found for the given question type and category"}, status=404)
+
+    try:
+        formatted_texts = "\n".join(str(text) for text in data_dict["context"]["texts"])
     except Exception as e:
         logger.error(f"Error in formatting texts: {e}")
         raise
 
     messages = []
-
-    gpt_prompt = (
-        "명지대학교 입학 관련된 상담을 진행하기 위한 챗봇입니다.\n\n"
-        "가이드라인:\n"
-        "명지대학교에는 크게 학생부교과, 학생부종합, 실기/실적, 기타 총 네 가지의 입학전형을 가집니다.\n"
-        "학생부교과안에는 면접이 포함된 전형과 포함되지 않는 전형으로 나뉘며 면접을 보지 않는 전형은 학교장추천전형, 기회균형전형, 특성화고교전형이 있고, "
-        "면접이 포함되는 전형은 교과면접전형, 만학도전형, 특성화고등졸재직자전형, 특수교육대상자전형이 있습니다.\n"
-        "학생부종합 안에는 면접이 포함된 전형과 포함되지 않는 전형으로 나뉘고, 면접을 포함하는 전형은 명지인재면접전형, 크리스천리더전형이며 "
-        "면접이 포함되지 않는 전형은 명지인재서류전형, 사회적배려대상자전형, 농어촌학생전형입니다.\n"
-        "실기/실적은 실기를 보는 실기우수자전형, 면접과 실적을 확인하는 특기자전형이 있습니다.\n"
-        "기타는 재외국민전형, 전교육과정국외이수자전형, 북한이탈주민전형이 있으며 면접 100% 심사를 통해 선발됩니다.\n\n"
-        "지시사항:\n"
-        "전형을 줄여서 말해도 구분할 수 있어야합니다. (예: 학교장추천전형: 학생부교과(학교장추천전형), 명지인재면접전형: 학생부종합(명지인재면접전형))\n"
-        "구분하기 애매한 전형의 경우에는 전형을 확실히 말해달라는 멘트와 함께 전형을 보여줄 수 있어야합니다. "
-        "(예: 학생부교과전형 설명해줘 - 학생부 교과 전형에는 학교장추천전형, 교과면접전형, 기회균형전형, 특성화고교전형, 만학도전형, 특성화고등졸재직자전형이 있습니다. "
-        "여기서 어떤 전형에 대해 설명해드릴까요?)\n"
-        "지원자격에 대한 모든 기준을 말해야합니다. "
-        "(예: 사회적배려대상자전형의 지원자격의 경우 1)직업군인, 경찰, 소방, 교정공무원의 자녀, 2) 다자녀 가정의 자녀, 3)북한이탈주민이나 제3국 출생 북한이탈주민 가정의 자녀, "
-        "4)다문화 가정의 자녀, 5)의사상자 및 그의 자녀가 지원할 수 있습니다.)\n"
-        "특정 전형에 대한 서류를 요청하는 경우 가능한 모든 서류를 말해야합니다. "
-        "(예: 사회적배려대상자전형의 경우 국내 고등학교 졸업(예정)자는 학교생활기록부와 입학원서, 검정고시출신자는 입학원서, "
-        "고등학교 졸업학력 검정고시 성적증명서 및 합격증명서, 학교생활기록부 대체서식, 국외고등학교졸업(예정)자는 입학원서와 국외고 성적증명서 및 졸업(예정)증명서, "
-        "학교생활기록부 대체 서식이 필요합니다.)\n"
-        "전형의 지원자격을 묻는 경우 지원자격 전체를 모두 답변해주세요.\n"
-        "**주어진 정보**만을 기반으로 답변을 생성해야 합니다. **추가적인 정보나 추측**은 절대 포함하지 말아야 합니다.\n"
-        "학생의 성적을 듣고, 환산점수를 계산해주지 않습니다. 대신 성적을 환산할 수 있는 사이트인 https://cs.u-is.co.kr/mju/score/ 로 안내해야합니다.\n\n"
-        "일반적으로 성적이 높은 경우 면접이 없는 전형을 추천하고, 성적이 낮은 경우 면접이 있는 전형을 추천합니다.\n\n"
-        "만약 주어진 정보로 충분한 답변을 제공할 수 없다면, '제공된 정보 내에서 답변할 수 없습니다.'라는 메시지를 반환하세요.\n"
-        "모든 대답의 마지막에는 ‘더욱 자세한 상담을 원하시면 명지대학교 입학처 02-300-1799,1800으로 전화주시길 바랍니다.’라는 멘트를 붙여야합니다.\n\n"
-    )
 
     text_message = {
         "type": "text",
@@ -157,11 +138,11 @@ def prompt_func(data_dict):
             # "- **Main Point 2**: Detail...\n"
         ),
     }
-    
+
     messages.append(text_message)
     return [HumanMessage(content=messages)]
 
-def multi_modal_rag_chain(retriever):
+def multi_modal_rag_chain(retriever, question_type, question_category):
     llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0, max_tokens=500)
 
     multi_query_retriever = MultiQueryRetriever.from_llm(
@@ -178,7 +159,7 @@ def multi_modal_rag_chain(retriever):
             "context": multi_query_retriever | RunnableLambda(split_text_types),
             "question": RunnablePassthrough(),
         }
-        | RunnableLambda(prompt_func)
+        | RunnableLambda(lambda data_dict: prompt_func(data_dict, question_type, question_category))
         | model
         | StrOutputParser()
     )
@@ -202,8 +183,8 @@ def multi_modal_rag_chain(retriever):
             description='Category of the question (모집요강, 입시결과, 기출문제, 대학생활, 면접/실기)',
             required=False,
             type=openapi.TYPE_STRING,
-            enum=['', '모집요강', '입시결과', '기출문제', '대학생활', '면접/실기'],
-            default=''
+            enum=['모집요강', '입시결과', '기출문제', '대학생활', '면접/실기'],
+            default='모집요강'
         ),
         openapi.Parameter(
             'question',
@@ -221,7 +202,7 @@ def multi_modal_rag_chain(retriever):
 def ask_question_api(request):
     question = request.POST.get("question")
     question_type = request.POST.get("questionType")
-    question_category = request.POST.get("questionCategory", "")
+    question_category = request.POST.get("questionCategory")
 
     logger.debug(f"Received question: {question}")
     logger.debug(f"Received question type: {question_type}")
@@ -232,7 +213,7 @@ def ask_question_api(request):
 
     if question_type not in ["수시", "정시", "편입학"]:
         return JsonResponse({"error": "Invalid question type provided"}, status=400)
-    
+
     start_time = time.time()
     retriever, references = get_relevant_documents(question_type, question_category, question)
     retrieval_time = time.time() - start_time
@@ -243,10 +224,8 @@ def ask_question_api(request):
         return JsonResponse({"error": "No relevant documents found"}, status=404)
 
     try:
-        chain_multimodal_rag = multi_modal_rag_chain(retriever)
-
+        chain_multimodal_rag = multi_modal_rag_chain(retriever, question_type, question_category)
         response = chain_multimodal_rag.invoke({"question": question})
-
         completion_time = time.time() - start_time
         logger.debug(f"RAG completion took {completion_time:.2f} seconds")
 
@@ -259,7 +238,6 @@ def ask_question_api(request):
         return JsonResponse({"error": "No relevant documents found"}, status=404)
 
     answer = response.strip()
-
     base_url = "http://127.0.0.1:8000" if settings.DEBUG else "https://marueggllmserver.com"
 
     references_response = [
@@ -270,8 +248,8 @@ def ask_question_api(request):
     ]
 
     return JsonResponse({
-        "questionType": question_type, 
-        "questionCategory": question_category, 
+        "questionType": question_type,
+        "questionCategory": question_category,
         "answer": answer,
         "references": references_response
     })
