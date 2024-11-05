@@ -25,6 +25,12 @@ from langchain_community.chat_models import ChatOpenAI
 os.environ['OPENAI_API_KEY'] = settings.OPENAI_API_KEY
 
 logging.basicConfig(level=logging.DEBUG)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("chromadb").setLevel(logging.WARNING)
+logging.getLogger("chromadb.telemetry").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -149,8 +155,6 @@ def multi_modal_rag_chain(retriever, question_type, question_category):
         retriever=retriever,
         llm=llm,
     )
-    logging.basicConfig()
-    logging.getLogger('langchain.retrievers.multi_query').setLevel(logging.INFO)
 
     model = ChatOpenAI(temperature=0, model="gpt-4o", max_tokens=2048)
 
@@ -204,10 +208,6 @@ def ask_question_api(request):
     question_type = request.POST.get("questionType")
     question_category = request.POST.get("questionCategory")
 
-    logger.debug(f"Received question: {question}")
-    logger.debug(f"Received question type: {question_type}")
-    logger.debug(f"Received question category: {question_category}")
-
     if not question:
         return JsonResponse({"error": "No content provided"}, status=400)
 
@@ -217,7 +217,6 @@ def ask_question_api(request):
     start_time = time.time()
     retriever, references = get_relevant_documents(question_type, question_category, question)
     retrieval_time = time.time() - start_time
-    logger.debug(f"Document retrieval took {retrieval_time:.2f} seconds")
 
     if not retriever:
         logger.debug("No relevant documents found.")
@@ -227,7 +226,6 @@ def ask_question_api(request):
         chain_multimodal_rag = multi_modal_rag_chain(retriever, question_type, question_category)
         response = chain_multimodal_rag.invoke({"question": question})
         completion_time = time.time() - start_time
-        logger.debug(f"RAG completion took {completion_time:.2f} seconds")
 
     except Exception as e:
         logger.error(f"Error during RAG processing: {e}")
