@@ -116,7 +116,6 @@ def prompt_func(data_dict, question_type, question_category):
             question_category=question_category
         )
         gpt_prompt = prompt_instance.prompt_text
-        print(gpt_prompt)
     except Prompt.DoesNotExist:
         logger.error("No prompt found for the given question type and category.")
         return JsonResponse({"error": "No prompt found for the given question type and category"}, status=404)
