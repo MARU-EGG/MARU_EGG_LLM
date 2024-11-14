@@ -135,7 +135,6 @@ def parse_pdf_file(file_path, doc_type, doc_category):
     모집요강 파일을 파싱하고 처리하는 함수.
     """
     pdf_document = pymupdf4llm.to_markdown(file_path, page_chunks=True)
-    print("ㄴㅇㄹㄴㅇㄹ:" + pymupdf4llm.__version__)
 
     # pageGap 설정 (수시: 1, 정시: 2)
     page_gap = 1 if doc_type == "수시" else 2
@@ -204,10 +203,17 @@ def modify_text_based_on_metadata(pdf_document):
         
         title = metadata.get('title', '')
         if title:
+            if "학생부종합" in title:
+                title = title.replace("학생부종합", "")
+            if "학생부교과" in title:
+                title = title.replace("학생부교과", "")
+            if "수능" in title:
+                title = title.replace("수능", "")
             text = f"**{title} 문서입니다. - 중요! 이 문서 전체는 {title}에 해당하는 정보입니다.**\n\n" + text
             text = f"**{title}**\n" + text
 
             pdf_document[idx]['text'] = text
+
 
 def save_parsed_pdf_to_db(pdf_document, doc_type, doc_category, title):
     model_class = get_model_class(doc_type)
