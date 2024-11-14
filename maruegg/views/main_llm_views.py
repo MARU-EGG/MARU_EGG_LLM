@@ -148,7 +148,7 @@ def prompt_func(data_dict, question_type, question_category):
     return [HumanMessage(content=messages)]
 
 def multi_modal_rag_chain(retriever, question_type, question_category):
-    llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0, max_tokens=500)
+    llm = ChatOpenAI(model_name="gpt-4o", temperature=0, max_tokens=500)
 
     multi_query_retriever = MultiQueryRetriever.from_llm(
         retriever=retriever,
@@ -167,6 +167,21 @@ def multi_modal_rag_chain(retriever, question_type, question_category):
         | StrOutputParser()
     )
     return chain
+
+# def multi_modal_rag_chain(retriever, question_type, question_category):
+#     model = ChatOpenAI(temperature=0, model="gpt-4o", max_tokens=2048)
+
+#     chain = (
+#         {
+#             "context": retriever | RunnableLambda(split_text_types),
+#             "question": RunnablePassthrough(),
+#         }
+#         | RunnableLambda(lambda data_dict: prompt_func(data_dict, question_type, question_category))
+#         | model
+#         | StrOutputParser()
+#     )
+#     return chain
+
 
 @swagger_auto_schema(
     method='post',
@@ -291,7 +306,7 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
             vectorstore = Chroma(
                 collection_name=f"{english_category}_collection",
                 embedding_function=embedding_function,
-                persist_directory=persist_directory
+                persist_directory=persist_directory,
             )
             retrievers[category] = create_multi_vector_retriever(vectorstore, doc_contents)
 
