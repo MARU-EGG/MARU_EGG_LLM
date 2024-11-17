@@ -11,7 +11,6 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from openai import OpenAI
 from ..models import Document1, Document2, Document3, Prompt
-from langchain_community.vectorstores import Chroma
 from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.storage import InMemoryStore
@@ -19,11 +18,16 @@ from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import HumanMessage
 from langchain_core.documents import Document
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain_community.chat_models import ChatOpenAI
 
+from langchain_openai import OpenAIEmbeddings
+from langchain_chroma import Chroma
+from langchain_openai import ChatOpenAI
+import hashlib
+
+# 환경 변수 설정
 os.environ['OPENAI_API_KEY'] = settings.OPENAI_API_KEY
 
+# 로깅 설정
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -32,20 +36,23 @@ logging.getLogger("chromadb").setLevel(logging.WARNING)
 logging.getLogger("chromadb.telemetry").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+
+# OpenAI 클라이언트 설정
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
+# 경로 설정
 MEDIA_DOCUMENT_URL = os.path.join(settings.MEDIA_ROOT, 'documents')
 MEDIA_FILES_URL = os.path.join(settings.MEDIA_ROOT, 'files')
 
-logger = logging.getLogger(__name__)
-
-import hashlib
-
+# 해시 생성 함수
 def generate_metadata_hash(metadata):
     """Generate a unique hash for a document based on its metadata."""
     metadata_string = "".join(str(value) for key, value in sorted(metadata.items()) if key != "doc_id")
     return hashlib.sha256(metadata_string.encode('utf-8')).hexdigest()
 
+
+
+# MultiVectorRetriever 생성 함수
 def create_multi_vector_retriever(vectorstore, doc_contents):
     store = InMemoryStore()
     id_key = "doc_id"
@@ -89,8 +96,6 @@ def create_multi_vector_retriever(vectorstore, doc_contents):
                 )
             )
             existing_docs.append((doc_id, metadata))
-        else:
-            logger.debug("Document with similar content already exists. Skipping.")
 
     if new_docs:
         retriever.vectorstore.add_documents(new_docs)
@@ -99,6 +104,7 @@ def create_multi_vector_retriever(vectorstore, doc_contents):
 
     return retriever
 
+# 텍스트 변환 함수
 def split_text_types(docs):
     texts = []
     for doc in docs:
@@ -109,6 +115,7 @@ def split_text_types(docs):
         texts.append(doc)
     return {"texts": texts}
 
+# 프롬프트 생성 함수
 def prompt_func(data_dict, question_type, question_category):
     try:
         prompt_instance = Prompt.objects.get(
@@ -126,40 +133,18 @@ def prompt_func(data_dict, question_type, question_category):
         logger.error(f"Error in formatting texts: {e}")
         raise
 
-    messages = []
+    return [HumanMessage(content=f"{gpt_prompt}\n\n질문: {data_dict['question']}\n\n{formatted_texts}")]
 
-    text_message = {
-        "type": "text",
-        "text": (
-            gpt_prompt +
-            f"## User-provided question:\n**{data_dict['question']}**\n\n"
-            "### Text and / or tables:\n"
-            f"```\n{formatted_texts}\n```\n\n"
-            # "Please provide your answer in the following format:\n"
-            # "- **Main Point 1**: Detail...\n"
-            # "- **Main Point 2**: Detail...\n"
-            # "- **Main Point 2**: Detail...\n"
-            # "- **Main Point 2**: Detail...\n"
-            # "- **Main Point 2**: Detail...\n"
-        ),
-    }
-
-    messages.append(text_message)
-    return [HumanMessage(content=messages)]
-
+# RAG 체인 생성 함수
 def multi_modal_rag_chain(retriever, question_type, question_category):
-    llm = ChatOpenAI(model_name="gpt-4o", temperature=0, max_tokens=500)
-
-    multi_query_retriever = MultiQueryRetriever.from_llm(
-        retriever=retriever,
-        llm=llm,
-    )
-
+    # 업데이트된 ChatOpenAI 클래스 사용
     model = ChatOpenAI(temperature=0, model="gpt-4o", max_tokens=2048)
 
+    # `invoke` 메서드를 사용하여 데이터를 검색하고 변환
     chain = (
         {
-            "context": multi_query_retriever | RunnableLambda(split_text_types),
+            "context": RunnableLambda(lambda query: retriever.invoke(str(query)))  # 문자열로 변환하여 전달
+                       | RunnableLambda(split_text_types),
             "question": RunnablePassthrough(),
         }
         | RunnableLambda(lambda data_dict: prompt_func(data_dict, question_type, question_category))
@@ -168,49 +153,14 @@ def multi_modal_rag_chain(retriever, question_type, question_category):
     )
     return chain
 
-# def multi_modal_rag_chain(retriever, question_type, question_category):
-#     model = ChatOpenAI(temperature=0, model="gpt-4o", max_tokens=2048)
-
-#     chain = (
-#         {
-#             "context": retriever | RunnableLambda(split_text_types),
-#             "question": RunnablePassthrough(),
-#         }
-#         | RunnableLambda(lambda data_dict: prompt_func(data_dict, question_type, question_category))
-#         | model
-#         | StrOutputParser()
-#     )
-#     return chain
-
 
 @swagger_auto_schema(
     method='post',
-    operation_description="questionType(수시, 정시, 편입학), questionCategory(모집요강, 입시결과, 기출문제, 대학생활, 면접/실기), question(질문)을 기반으로 rag방식 llm모델의 답변을 요청하는 api",
+    operation_description="질문 유형 및 카테고리를 기반으로 RAG 방식 LLM 모델의 답변을 요청합니다.",
     manual_parameters=[
-        openapi.Parameter(
-            'questionType',
-            openapi.IN_FORM,
-            description='Type of the question (수시, 정시, 편입학)',
-            required=True,
-            type=openapi.TYPE_STRING,
-            enum=['수시', '정시', '편입학']
-        ),
-        openapi.Parameter(
-            'questionCategory',
-            openapi.IN_FORM,
-            description='Category of the question (모집요강, 입시결과, 기출문제, 대학생활, 면접/실기)',
-            required=False,
-            type=openapi.TYPE_STRING,
-            enum=['모집요강', '입시결과', '기출문제', '대학생활', '면접/실기'],
-            default='모집요강'
-        ),
-        openapi.Parameter(
-            'question',
-            openapi.IN_FORM,
-            description='The actual question content',
-            required=True,
-            type=openapi.TYPE_STRING
-        ),
+        openapi.Parameter('questionType', openapi.IN_FORM, description='Type of the question', required=True, type=openapi.TYPE_STRING, enum=['수시', '정시', '편입학']),
+        openapi.Parameter('questionCategory', openapi.IN_FORM, description='Category of the question', required=False, type=openapi.TYPE_STRING, enum=['모집요강', '입시결과', '기출문제', '대학생활', '면접/실기'], default='모집요강'),
+        openapi.Parameter('question', openapi.IN_FORM, description='The actual question content', required=True, type=openapi.TYPE_STRING),
     ],
     responses={200: 'Success', 400: 'Invalid request', 404: 'No relevant documents found'}
 )
@@ -240,7 +190,6 @@ def ask_question_api(request):
         chain_multimodal_rag = multi_modal_rag_chain(retriever, question_type, question_category)
         response = chain_multimodal_rag.invoke({"question": question})
         completion_time = time.time() - start_time
-
     except Exception as e:
         logger.error(f"Error during RAG processing: {e}")
         return JsonResponse({"error": "An error occurred during processing"}, status=500)
@@ -266,6 +215,7 @@ def ask_question_api(request):
         "references": references_response
     })
 
+# 관련 문서 검색 함수
 def get_relevant_documents(question_type, question_category, question, max_docs=5):
     model_class = None
     if question_type == "수시":
@@ -285,13 +235,9 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
         "면접/실기": "interview_practice"
     }
 
-    if not question_category:
-        categories = ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]
-    else:
-        categories = [question_category]
+    categories = [question_category] if question_category else ["모집요강", "입시결과", "기출문제", "대학생활", "면접/실기"]
 
     retrievers = {}
-
     for category in categories:
         english_category = category_mapping.get(category, category)
         documents = model_class.objects.filter(category=category)
@@ -300,9 +246,8 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
             embedding_function = OpenAIEmbeddings()
 
             persist_directory = f"vectorDB/{class_name}/{english_category}_vectorDB"
-
             os.makedirs(persist_directory, exist_ok=True)
-            
+
             vectorstore = Chroma(
                 collection_name=f"{english_category}_collection",
                 embedding_function=embedding_function,
@@ -310,27 +255,17 @@ def get_relevant_documents(question_type, question_category, question, max_docs=
             )
             retrievers[category] = create_multi_vector_retriever(vectorstore, doc_contents)
 
-    if question_category:
-        retriever = retrievers.get(question_category)
-        if retriever:
-            relevant_docs = retriever.vectorstore.similarity_search_with_score(question, k=max_docs)
-        else:
-            return "", []
-    else:
-        relevant_docs = []
-        for category, retriever in retrievers.items():
-            category_docs = retriever.vectorstore.similarity_search_with_score(question, k=3)
-            relevant_docs.extend(category_docs)
+    retriever = retrievers.get(question_category) if question_category else None
+    relevant_docs = retriever.vectorstore.similarity_search_with_score(question, k=max_docs) if retriever else []
 
     if not relevant_docs:
         return "", []
 
-    references = []
-    for doc in relevant_docs[:3]:
-        metadata = doc[0].metadata
-        references.append({
-        "title": metadata.get("title", "Unknown Title"),
-        "page": metadata.get("page", "Unknown Page"),
-        "category": metadata.get("category", "Unknown Category")
-        })
+    references = [
+        {
+            "title": doc[0].metadata.get("title", "Unknown Title"),
+            "page": doc[0].metadata.get("page", "Unknown Page"),
+            "category": doc[0].metadata.get("category", "Unknown Category")
+        } for doc in relevant_docs[:3]
+    ]
     return retriever, references
