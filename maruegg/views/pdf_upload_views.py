@@ -162,7 +162,7 @@ def extract_toc(pdf_document, page_gap):
 
     for idx, page in enumerate(pdf_document):
         text = page['text']
-        if "CONTENTS" in text:
+        if "CONTENTS" in text or "Contents" in text:
             contentPage = idx + 1
             pdf_document[idx]['metadata']['title'] = "CONTENTS"
             break
