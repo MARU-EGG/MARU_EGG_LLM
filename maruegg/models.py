@@ -57,3 +57,29 @@ class Prompt(models.Model):
 
     def __str__(self):
         return f"{self.question_type} - {self.question_category}"
+    
+class TableOfContents(models.Model):
+    TYPE_CHOICES = [
+        ('수시', '수시'),
+        ('정시', '정시'),
+        ('편입학', '편입학'),
+    ]
+    CATEGORY_CHOICES = [
+        ('모집요강', '모집요강'),
+        ('입시결과', '입시결과'),
+        ('기출문제', '기출문제'),
+        ('대학생활', '대학생활'),
+        ('면접/실기', '면접/실기'),
+    ]
+    
+    toc_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    toc_category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    toc_text = models.TextField()
+    
+    class Meta:
+        unique_together = ('toc_type', 'toc_category')
+        verbose_name = "Table of Contents"
+        verbose_name_plural = "Table of Contents"
+    
+    def __str__(self):
+        return f"{self.toc_type} - {self.toc_category}"
